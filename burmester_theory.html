@@ -1,0 +1,2223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Burmester Four-Bar Synthesizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper:   #d4c9a8;
+    --paper2:  #c9bc97;
+    --ink:     #2b2415;
+    --faint:   #b8aa88;
+    --grid:    #9e9070;
+    --blue:    #1a4a8c;
+    --red:     #8c2a1a;
+    --green:   #2a6e2a;
+    --dim:     #6b5f42;
+    --stamp:   #7a3b10;
+    --border:  #8a7a58;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Courier Prime', monospace;
+    height: 100vh;
+    display: grid;
+    grid-template-columns: 310px 1fr;
+    grid-template-rows: auto 1fr;
+    overflow: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    grid-column: 1 / -1;
+    background: var(--ink);
+    color: var(--paper);
+    padding: 9px 22px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 3px solid var(--blue);
+    position: relative;
+  }
+  header::after {
+    content:''; position:absolute; bottom:-6px; left:0; right:0;
+    height:2px; background:var(--red);
+  }
+  header h1 {
+    font-family: 'Special Elite', serif;
+    font-size: 1.05rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--paper);
+  }
+  .header-sub {
+    font-size: 0.63rem; color: #a09070;
+    letter-spacing: 0.09em;
+    border-left: 1px solid #555; padding-left: 16px;
+  }
+  .header-stamp {
+    margin-left: auto;
+    font-family: 'Special Elite', serif;
+    font-size: 0.58rem; color: var(--stamp);
+    border: 2px solid var(--stamp);
+    padding: 3px 9px; letter-spacing: 0.12em;
+    transform: rotate(-1.5deg); opacity: 0.85;
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    background: var(--paper2);
+    border-right: 2px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow-y: auto; padding: 14px; gap: 14px;
+    box-shadow: inset -3px 0 8px rgba(0,0,0,0.06);
+  }
+  .sidebar::-webkit-scrollbar { width: 5px; }
+  .sidebar::-webkit-scrollbar-track { background: var(--paper2); }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .section-label {
+    font-family: 'Special Elite', serif;
+    font-size: 0.6rem; letter-spacing: 0.18em;
+    color: var(--dim); text-transform: uppercase;
+    margin-bottom: 8px; padding-bottom: 4px;
+    border-bottom: 1px dashed var(--border);
+  }
+
+  /* ── POINT LIST ── */
+  .point-list { display:flex; flex-direction:column; gap:5px; }
+  .point-item { display:grid; grid-template-columns:16px 1fr; gap:7px; align-items:center; }
+  .point-dot {
+    width:11px; height:11px; border-radius:50%;
+    background:var(--red); border:2px solid var(--ink);
+    box-shadow:1px 1px 0 var(--ink);
+  }
+  .point-dot.empty { background:transparent; border-color:var(--border); box-shadow:none; }
+  .point-coords { font-size:0.7rem; color:var(--ink); }
+  .point-coords.empty { color:var(--dim); font-style:italic; }
+
+  /* ── SLIDER ROW ── */
+  .slider-block { display:flex; flex-direction:column; gap:10px; }
+  .slider-row { display:flex; flex-direction:column; gap:3px; }
+  .slider-header { display:flex; justify-content:space-between; align-items:baseline; }
+  .slider-header label { font-size:0.62rem; letter-spacing:0.07em; color:var(--dim); text-transform:uppercase; }
+  .slider-val { font-size:0.72rem; font-weight:700; color:var(--ink); min-width:44px; text-align:right; }
+
+  input[type=range] {
+    -webkit-appearance:none; appearance:none;
+    width:100%; height:6px; background:transparent;
+    outline:none; cursor:pointer; border-radius:0;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height:6px; border:1px solid var(--border); border-radius:0;
+    background: linear-gradient(to right, var(--track-color,var(--blue)) var(--pct,0%), var(--faint) var(--pct,0%));
+  }
+  input[type=range]::-moz-range-track { height:6px; background:var(--faint); border:1px solid var(--border); }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance:none;
+    width:13px; height:19px; margin-top:-7px;
+    background:var(--ink); border:1px solid var(--paper2);
+    box-shadow:1px 1px 0 var(--border); cursor:pointer; border-radius:1px;
+  }
+  input[type=range]:disabled { opacity:0.38; cursor:not-allowed; }
+  input[type=range]:disabled::-webkit-slider-thumb { cursor:not-allowed; }
+
+  .slider-ticks { display:flex; justify-content:space-between; padding:1px 2px 0; }
+  .slider-ticks span { font-size:0.48rem; color:var(--dim); }
+
+  /* ── BUTTONS ── */
+  .btn {
+    font-family:'Courier Prime',monospace; font-size:0.7rem;
+    letter-spacing:0.1em; padding:8px 12px;
+    cursor:pointer; border:2px solid var(--ink);
+    text-transform:uppercase; width:100%;
+    transition:all 0.1s; box-shadow:3px 3px 0 var(--ink); border-radius:0;
+  }
+  .btn:active { transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink); }
+  .btn-primary { background:var(--ink); color:var(--paper); font-weight:700; }
+  .btn-primary:hover { background:var(--blue); border-color:var(--blue); }
+  .btn-primary:disabled { opacity:0.35; cursor:not-allowed; box-shadow:none; }
+  .btn-secondary { background:transparent; color:var(--dim); border-color:var(--border); box-shadow:2px 2px 0 var(--border); }
+  .btn-secondary:hover { border-color:var(--red); color:var(--red); box-shadow:2px 2px 0 var(--red); }
+  .btn-anim { background:var(--blue); color:#fff; border-color:var(--blue); }
+  .btn-anim:hover { background:#0f3268; }
+  .btn-anim:disabled { opacity:0.35; cursor:not-allowed; box-shadow:none; }
+
+  /* ── STATUS ── */
+  .status-tag {
+    display:inline-block; font-family:'Special Elite',serif;
+    font-size:0.6rem; letter-spacing:0.08em; padding:4px 10px;
+    text-transform:uppercase; background:#e8dfc0;
+    color:var(--green); border:1px solid var(--green);
+  }
+  .status-tag.error { color:var(--red); border-color:var(--red); background:#f5e0da; }
+  .status-tag.info  { color:var(--blue); border-color:var(--blue); background:#dde7f5; }
+
+  /* ── HINT ── */
+  .hint-box {
+    background:#e8dfc0; border:1px dashed var(--border);
+    padding:10px 12px; font-size:0.63rem; line-height:1.65; color:var(--dim);
+  }
+  .hint-box strong { color:var(--ink); font-weight:700; }
+
+  .divider { border:none; border-top:1px dashed var(--border); }
+
+  /* ── CANVAS ── */
+  .canvas-wrap { position:relative; overflow:hidden; }
+  canvas { display:block; cursor:crosshair; width:100%; height:100%; }
+
+  /* ── LEGEND ── */
+  .canvas-overlay {
+    position:absolute; top:14px; right:14px;
+    background:rgba(212,201,168,0.93); border:1px solid var(--border);
+    padding:10px 14px; display:flex; flex-direction:column; gap:6px;
+    box-shadow:2px 2px 0 var(--border);
+  }
+  .legend-title {
+    font-family:'Special Elite',serif; font-size:0.57rem;
+    letter-spacing:0.15em; color:var(--dim); text-transform:uppercase;
+    border-bottom:1px dashed var(--border); padding-bottom:5px; margin-bottom:2px;
+  }
+  .legend-item { display:flex; align-items:center; gap:8px; font-size:0.62rem; color:var(--ink); }
+  .legend-line { width:24px; height:3px; }
+
+  /* ── COORDS ── */
+  .coords-display {
+    position:absolute; bottom:10px; left:12px;
+    font-size:0.62rem; color:var(--dim);
+    pointer-events:none; background:rgba(212,201,168,0.85);
+    padding:3px 9px; border:1px solid var(--border);
+  }
+  .corner-mark {
+    position:absolute; font-family:'Special Elite',serif;
+    font-size:0.5rem; color:var(--dim); letter-spacing:0.07em;
+    bottom:10px; right:14px;
+  }
+
+  /* ── MODE TABS ── */
+  .mode-tabs { display:flex; gap:6px; margin-left:10px; }
+  .mode-tab {
+    font-family:'Courier Prime',monospace; font-size:0.6rem; letter-spacing:0.1em;
+    padding:4px 14px; cursor:pointer; border:1px solid #555; color:#a09070;
+    background:transparent; text-transform:uppercase; transition:all 0.15s;
+  }
+  .mode-tab.active { background:var(--blue); border-color:var(--blue); color:#fff; }
+  .mode-tab:hover:not(.active) { border-color:var(--faint); color:var(--paper); }
+
+  /* ── GRAPHICAL SIDEBAR EXTRAS ── */
+  .g-step-list { display:flex; flex-direction:column; gap:5px; }
+  .g-step-row {
+    display:grid; grid-template-columns:22px 1fr auto;
+    gap:5px; align-items:start; padding:5px 6px;
+    border:1px solid transparent; border-radius:1px;
+    transition: all 0.2s;
+  }
+  .g-step-row.done { background:#e3f0e3; border-color:#8cb89e; }
+  .g-step-num { font-family:'Special Elite',serif; font-size:0.65rem; color:var(--dim); padding-top:2px; }
+  .g-step-body { font-size:0.61rem; line-height:1.6; color:var(--ink); }
+  .g-step-body em { color:var(--dim); font-style:normal; font-size:0.57rem; }
+  .g-badge {
+    font-size:0.5rem; padding:2px 5px; letter-spacing:0.06em;
+    border:1px solid; white-space:nowrap; margin-top:2px; align-self:start;
+    font-family:'Special Elite',serif;
+  }
+  .g-badge-ok   { color:var(--green); border-color:var(--green); background:#e8f4e8; }
+  .g-badge-err  { color:var(--red);   border-color:var(--red);   background:#f5e0da; }
+  .g-badge-pend { color:var(--dim);   border-color:var(--border); background:#e8dfc0; }
+
+  .branch-row { display:flex; gap:4px; margin-top:5px; flex-wrap:wrap; align-items:center; }
+  .branch-lbl { font-size:0.56rem; color:var(--dim); }
+  .branch-btn {
+    font-size:0.56rem; padding:3px 7px; cursor:pointer;
+    border:1px solid var(--border); background:transparent;
+    font-family:'Courier Prime',monospace; letter-spacing:0.05em; transition:all 0.1s;
+  }
+  .branch-btn.active { background:var(--ink); color:var(--paper); border-color:var(--ink); }
+  .branch-btn:hover:not(.active) { border-color:var(--blue); color:var(--blue); }
+
+  .g-info-row { display:flex; justify-content:space-between; font-size:0.61rem; padding:2px 0; border-bottom:1px dotted rgba(138,122,88,0.3); }
+  .g-info-label { color:var(--dim); }
+  .g-info-val { font-weight:700; color:var(--ink); }
+
+  .legend-dot { width:10px; height:10px; border-radius:50%; border:1.5px solid var(--ink); flex-shrink:0; }
+
+  /* ── DEFECT OVERLAY ── */
+  #defectOverlay {
+    display:none; position:absolute; inset:0; pointer-events:none; z-index:10;
+    animation: defPulse 1.1s ease-in-out infinite;
+  }
+  #defectOverlay.visible { display:block; }
+  @keyframes defPulse {
+    0%,100% { box-shadow: inset 0 0 0 6px rgba(140,42,26,0.15), inset 0 0 40px rgba(140,42,26,0.06); }
+    50%      { box-shadow: inset 0 0 0 6px rgba(140,42,26,0.65), inset 0 0 80px rgba(140,42,26,0.22); }
+  }
+  #defectBanner {
+    display:none; position:absolute; top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    background:rgba(130,30,20,0.95); color:#fff;
+    padding:18px 30px; text-align:center;
+    border:2px solid #f5a0a0; box-shadow:5px 5px 0 rgba(0,0,0,0.45);
+    z-index:20; pointer-events:none; max-width:420px;
+  }
+  #defectBanner.visible { display:block; animation: bannerIn 0.3s ease; }
+  @keyframes bannerIn { from{opacity:0;transform:translate(-50%,-58%)} to{opacity:1;transform:translate(-50%,-50%)} }
+  #defectBanner h3 { font-family:'Special Elite',serif; font-size:1.1rem; letter-spacing:0.12em; margin-bottom:8px; }
+  #defectBanner p  { font-size:0.68rem; opacity:0.92; line-height:1.6; }
+  #defectBanner .def-fix { margin-top:10px; font-size:0.62rem; opacity:0.75; font-style:italic; }
+
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Four Point Coupler Curve Synthesis</h1>
+  <span class="header-sub">Theory of Machines &amp; Mechanisms</span>
+  <div class="mode-tabs">
+    <button class="mode-tab active" id="tabA" onclick="setMode('A')">&#9650; Analytical</button>
+    <button class="mode-tab"        id="tabG"  onclick="setMode('G')">&#9670; 4-Pt Graphical</button>
+    <button class="mode-tab"        id="tabG5" onclick="setMode('G5')">&#11041; 5-Pt Graphical</button>
+  </div>
+  <div class="header-stamp">ME252</div>
+</header>
+
+<!-- Analytical sidebar -->
+<div class="sidebar" id="sidebarA">
+
+
+  <div>
+    <div class="section-label">Precision Points</div>
+    <div class="point-list" id="pointList"></div>
+    <div style="margin-top:9px;">
+      <button class="btn btn-secondary" onclick="clearPoints()">&#8635; Clear Points</button>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div>
+    <div class="section-label">Coupler Angles &phi; (deg)</div>
+    <div class="slider-block" id="phiSliders"></div>
+  </div>
+
+  <hr class="divider">
+
+  <div>
+    <div class="section-label">Free Choice Angles &gamma; (deg)</div>
+    <div class="slider-block">
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <label style="color:var(--blue)">&#9632; Dyad 1 &mdash; &gamma;&#8322;</label>
+          <span class="slider-val" id="gam1Val">20&deg;</span>
+        </div>
+        <input type="range" id="gam1Slider" min="1" max="359" value="20"
+          style="--track-color:var(--blue)"
+          oninput="onSliderChange('gam1Slider','gam1Val','var(--blue)')">
+        <div class="slider-ticks"><span>1&deg;</span><span>90&deg;</span><span>180&deg;</span><span>270&deg;</span><span>359&deg;</span></div>
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <label style="color:var(--red)">&#9632; Dyad 2 &mdash; &gamma;&#8322;</label>
+          <span class="slider-val" id="gam2Val">345&deg;</span>
+        </div>
+        <input type="range" id="gam2Slider" min="1" max="359" value="345"
+          style="--track-color:var(--red)"
+          oninput="onSliderChange('gam2Slider','gam2Val','var(--red)')">
+        <div class="slider-ticks"><span>1&deg;</span><span>90&deg;</span><span>180&deg;</span><span>270&deg;</span><span>359&deg;</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div style="display:flex;flex-direction:column;gap:8px;">
+    <button class="btn btn-primary" id="solveBtn" onclick="solve()" disabled>&#9650; Synthesize Linkage</button>
+    <button class="btn btn-anim"    id="animBtn"  onclick="toggleAnim()" disabled>&#9654; Animate</button>
+  </div>
+
+  <div id="statusBox"></div>
+
+  <div class="hint-box">
+    <strong>How to use:</strong><br>
+    Click <strong>4 points</strong> on the canvas as precision positions.
+    Adjust <strong>&phi;</strong> (coupler rotation at each position)
+    and <strong>&gamma;</strong> (free-choice crank angles) &mdash; linkage re-synthesizes live.<br><br>
+    <strong>Pan:</strong> Alt/Opt+drag &nbsp;|&nbsp; <strong>Zoom:</strong> Scroll
+  </div>
+
+
+</div>
+
+<!-- ══════════ GRAPHICAL SIDEBAR ══════════ -->
+<div class="sidebar" id="sidebarG" style="display:none;">
+
+  <div>
+    <div class="section-label">Precision Points C&#8321;&ndash;C&#8324;</div>
+    <div class="point-list" id="pointListG"></div>
+    <div style="margin-top:9px;">
+      <button class="btn btn-secondary" onclick="clearPointsG()">&#8635; Reset All</button>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div>
+    <div class="section-label">Point Position Reduction &mdash; Steps</div>
+    <div class="g-step-list">
+
+      <div class="g-step-row" id="gstep1">
+        <span class="g-step-num">1&ndash;2</span>
+        <div class="g-step-body">
+          Mid-normal <em>c&#8321;&#8323;</em> of C&#8321;C&#8323;. Place <strong>H<sub>R</sub></strong> on it.
+          <div class="slider-row" style="margin-top:5px;">
+            <div class="slider-header">
+              <label>H<sub>R</sub> position (t)</label><span class="slider-val" id="gHRtVal">0.0</span>
+            </div>
+            <input type="range" id="gHRtSlider" min="-25" max="25" value="0" step="0.5"
+              style="--track-color:var(--stamp)" oninput="gOnHRt()">
+            <div class="slider-ticks"><span>-25</span><span>0</span><span>+25</span></div>
+          </div>
+        </div>
+        <span class="g-badge g-badge-pend" id="badge1">WAIT</span>
+      </div>
+
+      <div class="g-step-row" id="gstep2">
+        <span class="g-step-num">3&ndash;4</span>
+        <div class="g-step-body">
+          Circle(H<sub>R</sub>, <strong>R</strong>) &cap; Circle(C&#8321;,<strong>r</strong>) &rarr; <strong>A&#8321;</strong><br>
+          Circle(H<sub>R</sub>, R) &cap; Circle(C&#8323;, r) &rarr; <strong>A&#8323;</strong>
+          <div class="slider-row" style="margin-top:5px;">
+            <div class="slider-header"><label>R (H<sub>R</sub> arc radius)</label><span class="slider-val" id="gRVal">3.0</span></div>
+            <input type="range" id="gRSlider" min="0.5" max="20" value="3" step="0.25"
+              style="--track-color:var(--blue)" oninput="gOnR()">
+          </div>
+          <div class="slider-row" style="margin-top:4px;">
+            <div class="slider-header"><label>r (coupler radius)</label><span class="slider-val" id="grVal">2.5</span></div>
+            <input type="range" id="grSlider" min="0.5" max="20" value="2.5" step="0.25"
+              style="--track-color:var(--green)" oninput="gOnr()">
+          </div>
+          <div class="branch-row">
+            <span class="branch-lbl">A&#8321; branch:</span>
+            <button class="branch-btn active" id="bA1_0" onclick="gSetBranch('A1',0)">&#9670; 1</button>
+            <button class="branch-btn"        id="bA1_1" onclick="gSetBranch('A1',1)">&#9671; 2</button>
+            <span class="branch-lbl" style="margin-left:4px;">A&#8323;:</span>
+            <button class="branch-btn active" id="bA3_0" onclick="gSetBranch('A3',0)">&#9670; 1</button>
+            <button class="branch-btn"        id="bA3_1" onclick="gSetBranch('A3',1)">&#9671; 2</button>
+          </div>
+        </div>
+        <span class="g-badge g-badge-pend" id="badge2">WAIT</span>
+      </div>
+
+      <div class="g-step-row" id="gstep3">
+        <span class="g-step-num">5&ndash;6</span>
+        <div class="g-step-body">
+          Mid-normal <em>a&#8321;&#8323;</em> of A&#8321;A&#8323; (passes thru H<sub>R</sub>).
+          Place <strong>H<sub>C</sub></strong> anywhere on <em>a&#8321;&#8323;</em>.
+          <div class="slider-row" style="margin-top:5px;">
+            <div class="slider-header"><label>H<sub>C</sub> position (t)</label><span class="slider-val" id="gHCtVal">-5.0</span></div>
+            <input type="range" id="gHCtSlider" min="-25" max="25" value="-5" step="0.5"
+              style="--track-color:var(--stamp)" oninput="gOnHCt()">
+            <div class="slider-ticks"><span>-25</span><span>0</span><span>+25</span></div>
+          </div>
+        </div>
+        <span class="g-badge g-badge-pend" id="badge3">WAIT</span>
+      </div>
+
+      <div class="g-step-row" id="gstep4">
+        <span class="g-step-num">7&ndash;9</span>
+        <div class="g-step-body">
+          Crank circle (H<sub>C</sub>, R<sub>c</sub>) passes thru A&#8321;,A&#8323;.<br>
+          Circle(C&#8322;,r) &rarr; <strong>A&#8322;</strong>; Circle(C&#8324;,r) &rarr; <strong>A&#8324;</strong>
+          <div class="branch-row">
+            <span class="branch-lbl">A&#8322;/A&#8324; branch:</span>
+            <button class="branch-btn active" id="bB_0" onclick="gSetBranch('B',0)">&#9670; 1</button>
+            <button class="branch-btn"        id="bB_1" onclick="gSetBranch('B',1)">&#9671; 2</button>
+          </div>
+        </div>
+        <span class="g-badge g-badge-pend" id="badge4">WAIT</span>
+      </div>
+
+      <div class="g-step-row" id="gstep5">
+        <span class="g-step-num">10</span>
+        <div class="g-step-body">
+          <strong>Inversion on Follower.</strong> Rotate H<sub>R</sub> from positions 2&amp;4 into position&nbsp;1 frame:<br>
+          P&#8322; = T(H<sub>R</sub>;&nbsp;C&#8322;A&#8322;&rarr;C&#8321;A&#8321;)<br>
+          P&#8324; = T(H<sub>R</sub>;&nbsp;C&#8324;A&#8324;&rarr;C&#8321;A&#8321;)<br>
+          <em>&#9651;C&#8322;A&#8322;H<sub>R</sub> &cong; &#9651;C&#8321;A&#8321;&middot;2 &nbsp; (similar triangles)</em>
+        </div>
+        <span class="g-badge g-badge-pend" id="badge5">WAIT</span>
+      </div>
+
+      <div class="g-step-row" id="gstep6">
+        <span class="g-step-num">11</span>
+        <div class="g-step-body">
+          <strong>B&#8321; = circumcenter(P&#8322;, H<sub>R</sub>, P&#8324;)</strong><br>
+          The rocker-coupler hinge is <em>found automatically</em>. Fixed pivots are H<sub>C</sub> and H<sub>R</sub>.<br>
+          Four-bar: H<sub>C</sub> &rarr; A &rarr; coupler(C) &rarr; B &rarr; H<sub>R</sub>. Press <strong>Animate</strong>!
+        </div>
+        <span class="g-badge g-badge-pend" id="badge6">WAIT</span>
+      </div>
+
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div>
+    <div class="section-label">Mechanism Output</div>
+    <div id="gMechInfo">
+      <div class="g-info-row"><span class="g-info-label">H<sub>C</sub> (crank pivot)</span><span class="g-info-val" id="gHCcoords">&mdash;</span></div>
+      <div class="g-info-row"><span class="g-info-label">H<sub>R</sub> (rocker pivot, fixed)</span><span class="g-info-val" id="gHRcoords">&mdash;</span></div>
+      <div class="g-info-row"><span class="g-info-label">Crank length R<sub>c</sub></span><span class="g-info-val" id="gCrankLen">&mdash;</span></div>
+      <div class="g-info-row"><span class="g-info-label">Rocker length</span><span class="g-info-val" id="gRockerLen">&mdash;</span></div>
+      <div class="g-info-row"><span class="g-info-label">Ground |H<sub>C</sub>&ndash;H<sub>R</sub>|</span><span class="g-info-val" id="gGroundLen">&mdash;</span></div>
+      <div class="g-info-row" style="border-bottom:none;"><span class="g-info-label">Grashof class</span><span class="g-info-val" id="gGrashof">&mdash;</span></div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div style="display:flex;flex-direction:column;gap:8px;">
+    <button class="btn btn-anim" id="animBtnG" onclick="toggleAnimG()" disabled>&#9654; Animate Mechanism</button>
+  </div>
+
+  <div id="statusBoxG"></div>
+
+  <div class="hint-box">
+    <strong>Graphical PPR (Point Position Reduction):</strong><br>
+    1. Click canvas to place <strong>C&#8321;&ndash;C&#8324;</strong>.<br>
+    2. Drag <strong>H<sub>R</sub></strong> or use slider to position on c&#8321;&#8323;.<br>
+    3. Tune <strong>R</strong> and <strong>r</strong> so arcs intersect.<br>
+    4. Drag <strong>H<sub>C</sub></strong> or use slider on a&#8321;&#8323;.<br>
+    5. B&#8321; is <em>automatically computed</em> via inversion.<br>
+    6. Hit <strong>Animate</strong>. Fixed pivots: H<sub>C</sub> and H<sub>R</sub>.<br><br>
+    <strong>Pan:</strong> Alt+drag &nbsp;|&nbsp; <strong>Zoom:</strong> Scroll
+  </div>
+
+</div>
+
+</div>
+
+
+<!-- ══════════ 5-POINT GRAPHICAL SIDEBAR ══════════ -->
+<div class="sidebar" id="sidebarG5" style="display:none;">
+
+  <div>
+    <div class="sec-lbl">Precision Points C&#8321;&ndash;C&#8325;</div>
+    <div class="point-list" id="ptListG5"></div>
+    <div style="margin-top:7px;">
+      <button class="btn btn-s" onclick="g5Clear()">&#8635; Reset All</button>
+    </div>
+  </div>
+
+  <hr class="div">
+
+  <div>
+    <div class="sec-lbl">Point Position Reduction &mdash; 5 Pts</div>
+    <div class="g-step-list">
+
+      <div class="g-step-row" id="g5step1">
+        <span class="g-step-num">1&ndash;2</span>
+        <div class="g-step-body">
+          <strong>H<sub>R</sub> = c&#8321;&#8325; &cap; c&#8322;&#8323;</strong><br>
+          c&#8321;&#8325; = mid-normal of C&#8321;C&#8325;<br>
+          c&#8322;&#8323; = mid-normal of C&#8322;C&#8323;<br>
+          <em>H<sub>R</sub> is uniquely determined (no slider needed)</em>
+        </div>
+        <span class="g-badge g-badge-pend" id="g5b1">WAIT</span>
+      </div>
+
+      <div class="g-step-row" id="g5step2">
+        <span class="g-step-num">3&ndash;6</span>
+        <div class="g-step-body">
+          Rotate by &phi;&#8321;&#8325;/2 about H<sub>R</sub> &rarr; C&#8321;&prime;, C&#8322;&prime;<br>
+          Arc(C&#8321;,r) &cap; Arc(C&#8321;&prime;,r) &rarr; <strong>A&#8321;</strong><br>
+          Arc(C&#8322;,r) &cap; Arc(C&#8322;&prime;,r) &rarr; <strong>A&#8322;</strong>
+          <div class="sl-row" style="margin-top:5px;">
+            <div class="sl-hdr"><label>r &mdash; coupler arm</label><span class="sl-val" id="g5rVal">2.50</span></div>
+            <input type="range" id="g5rSlider" min="0.3" max="14" step="0.1" value="2.5"
+              style="--track-color:var(--red)" oninput="g5OnR()">
+            <div class="sl-ticks"><span>0.3</span><span>7</span><span>14</span></div>
+          </div>
+          <div class="branch-row">
+            <span class="branch-lbl">A&#8321;:</span>
+            <button class="branch-btn active" id="g5bA1_0" onclick="g5Branch('A1',0)">&#9670;1</button>
+            <button class="branch-btn"        id="g5bA1_1" onclick="g5Branch('A1',1)">&#9671;2</button>
+            <span class="branch-lbl" style="margin-left:4px;">A&#8322;:</span>
+            <button class="branch-btn active" id="g5bA2_0" onclick="g5Branch('A2',0)">&#9670;1</button>
+            <button class="branch-btn"        id="g5bA2_1" onclick="g5Branch('A2',1)">&#9671;2</button>
+          </div>
+        </div>
+        <span class="g-badge g-badge-pend" id="g5b2">WAIT</span>
+      </div>
+
+      <div class="g-step-row" id="g5step3">
+        <span class="g-step-num">7&ndash;8</span>
+        <div class="g-step-body">
+          a&#8321;&#8322; = mid-normal of A&#8321;A&#8322;<br>
+          a&#8322;&#8323; = transferred bisector (c&#8321;&#8325; rotated &phi;&#8321;&#8325;/2)<br>
+          <strong>H<sub>C</sub> = a&#8321;&#8322; &cap; a&#8322;&#8323;</strong> (unique)
+        </div>
+        <span class="g-badge g-badge-pend" id="g5b3">WAIT</span>
+      </div>
+
+      <div class="g-step-row" id="g5step4">
+        <span class="g-step-num">9&ndash;13</span>
+        <div class="g-step-body">
+          Crank circle(H<sub>C</sub>, R<sub>c</sub>) through A&#8321;,A&#8322;<br>
+          A&#8323;,A&#8324;,A&#8325; from arcs(C&#8323;&ndash;C&#8325;, r) &cap; crank circle
+          <div class="branch-row">
+            <span class="branch-lbl">A&#8323;:</span>
+            <button class="branch-btn active" id="g5bA3_0" onclick="g5Branch('A3',0)">&#9670;1</button>
+            <button class="branch-btn"        id="g5bA3_1" onclick="g5Branch('A3',1)">&#9671;2</button>
+            <span class="branch-lbl" style="margin-left:3px;">A&#8324;:</span>
+            <button class="branch-btn active" id="g5bA4_0" onclick="g5Branch('A4',0)">&#9670;1</button>
+            <button class="branch-btn"        id="g5bA4_1" onclick="g5Branch('A4',1)">&#9671;2</button>
+            <span class="branch-lbl" style="margin-left:3px;">A&#8325;:</span>
+            <button class="branch-btn active" id="g5bA5_0" onclick="g5Branch('A5',0)">&#9670;1</button>
+            <button class="branch-btn"        id="g5bA5_1" onclick="g5Branch('A5',1)">&#9671;2</button>
+          </div>
+        </div>
+        <span class="g-badge g-badge-pend" id="g5b4">WAIT</span>
+      </div>
+
+      <div class="g-step-row" id="g5step5">
+        <span class="g-step-num">14&ndash;17</span>
+        <div class="g-step-body">
+          <strong>Inversion on follower:</strong><br>
+          Pt [2,3] = T(H<sub>R</sub>; C&#8322;A&#8322;&rarr;C&#8321;A&#8321;)<br>
+          Pt [4] &nbsp;&nbsp;= T(H<sub>R</sub>; C&#8324;A&#8324;&rarr;C&#8321;A&#8321;)<br>
+          <strong>B&#8321; = circumcenter([2,3], [4], H<sub>R</sub>)</strong>
+        </div>
+        <span class="g-badge g-badge-pend" id="g5b5">WAIT</span>
+      </div>
+
+    </div>
+  </div>
+
+  <hr class="div">
+
+  <div>
+    <div class="sec-lbl">Mechanism Output</div>
+    <div id="g5MechInfo">
+      <div class="g-info-row"><span class="g-info-label">H<sub>R</sub> (rocker pivot)</span><span class="g-info-val" id="g5HRc">&mdash;</span></div>
+      <div class="g-info-row"><span class="g-info-label">H<sub>C</sub> (crank pivot)</span><span class="g-info-val" id="g5HCc">&mdash;</span></div>
+      <div class="g-info-row"><span class="g-info-label">B&#8321; (rocker tip)</span><span class="g-info-val" id="g5B1c">&mdash;</span></div>
+      <div class="g-info-row"><span class="g-info-label">Crank R<sub>c</sub></span><span class="g-info-val" id="g5CrankL">&mdash;</span></div>
+      <div class="g-info-row"><span class="g-info-label">Ground |H<sub>C</sub>&ndash;H<sub>R</sub>|</span><span class="g-info-val" id="g5GroundL">&mdash;</span></div>
+      <div class="g-info-row" style="border-bottom:none;"><span class="g-info-label">Grashof class</span><span class="g-info-val" id="g5Grash">&mdash;</span></div>
+    </div>
+  </div>
+
+  <hr class="div">
+
+  <div style="display:flex;flex-direction:column;gap:7px;">
+    <button class="btn btn-a" id="animBtnG5" onclick="g5ToggleAnim()" disabled>&#9654; Animate Mechanism</button>
+  </div>
+  <div id="statusBoxG5"></div>
+
+  <div class="hint"><strong>5-Point PPR:</strong><br>
+    Place <strong>C&#8321;&ndash;C&#8325;</strong> on canvas.<br>
+    H<sub>R</sub> = c&#8321;&#8325;&cap;c&#8322;&#8323; and H<sub>C</sub> = a&#8321;&#8322;&cap;a&#8322;&#8323; are <em>uniquely determined</em>.<br>
+    Only <strong>r</strong> (coupler arm) is a free parameter.<br>
+    B&#8321; found by inversion &rarr; same as 4-pt but 5 constraints pin both pivots.<br><br>
+    <strong>Drag</strong> any C<sub>i</sub> &nbsp;|&nbsp; <strong>Pan:</strong> Alt+drag &nbsp;|&nbsp; <strong>Zoom:</strong> Scroll</div>
+
+</div>
+
+<div class="canvas-wrap">
+  <canvas id="c"></canvas>
+
+  <div class="canvas-overlay" id="legendA">
+    <div class="legend-title">Legend</div>
+    <div class="legend-item"><div class="legend-line" style="background:var(--red);"></div>Precision Pts</div>
+    <div class="legend-item"><div class="legend-line" style="background:var(--blue);"></div>Dyad 1</div>
+    <div class="legend-item"><div class="legend-line" style="background:var(--red);"></div>Dyad 2</div>
+    <div class="legend-item"><div class="legend-line" style="background:var(--green);"></div>Coupler</div>
+  </div>
+
+  <!-- Graphical legend -->
+  <div class="canvas-overlay" id="legendG" style="display:none;">
+    <div class="legend-title">Legend</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#8c2a1a;border-color:#8c2a1a;"></div>C&#8321;&ndash;C&#8324; precision pts</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#7a3b10;border-color:#7a3b10;"></div>H<sub>R</sub> (drag on c&#8321;&#8323;)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#1a4a8c;border-color:#1a4a8c;"></div>H<sub>C</sub> crank pivot</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#2a6e2a;border-color:#2a6e2a;"></div>A&#8321;&ndash;A&#8324; crank pins</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#9b6fa0;border-color:#9b6fa0;"></div>B&#8321; rocker tip</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#2a6e6e;border-color:#2a6e6e;"></div>P&#8322;, P&#8324; inverted pts</div>
+  </div>
+
+  <!-- G5 legend -->
+  <div class="ov" id="legendG5" style="display:none;">
+    <div class="ov-ttl">Legend (5-Pt)</div>
+    <div class="ov-row"><div class="ov-line" style="background:var(--red)"></div>C&#8321;&ndash;C&#8325; precision</div>
+    <div class="ov-row"><div class="ov-line" style="background:var(--blue);opacity:0.5"></div>c&#8321;&#8325; bisector</div>
+    <div class="ov-row"><div class="ov-line" style="background:var(--green);opacity:0.5"></div>c&#8322;&#8323; bisector</div>
+    <div class="ov-row"><div class="ov-line" style="background:var(--stamp)"></div>a&#8321;&#8322; bisector</div>
+    <div class="ov-row"><div class="ov-line" style="background:var(--blue)"></div>a&#8322;&#8323; (transferred)</div>
+    <div class="ov-row"><div class="ov-line" style="background:#7b2d8b"></div>B&#8321;, P[2,3], P[4]</div>
+  </div>
+
+  <!-- G5 Legend -->
+  <div class="canvas-overlay" id="legendG5" style="display:none;">
+    <div class="legend-title">Legend (5-Pt)</div>
+    <div class="legend-item"><div class="legend-line" style="background:var(--red);"></div>C&#8321;&ndash;C&#8325; precision</div>
+    <div class="legend-item"><div class="legend-line" style="background:rgba(26,74,140,0.6);"></div>c&#8321;&#8325; bisector</div>
+    <div class="legend-item"><div class="legend-line" style="background:rgba(42,110,42,0.6);"></div>c&#8322;&#8323; bisector</div>
+    <div class="legend-item"><div class="legend-line" style="background:var(--stamp);"></div>a&#8321;&#8322; bisector</div>
+    <div class="legend-item"><div class="legend-line" style="background:var(--blue);"></div>a&#8322;&#8323; transferred</div>
+    <div class="legend-item"><div class="legend-line" style="background:#7b2d8b;"></div>B&#8321; (auto)</div>
+  </div>
+
+  <!-- Defect overlay -->
+  <div id="defectOverlay"></div>
+  <div id="defectBanner">
+    <h3 id="defectType">&#9888; Circuit Defect</h3>
+    <p id="defectDetail">Linkage cannot reach this configuration.</p>
+    <p class="def-fix" id="defectFix">Try adjusting H<sub>C</sub>, R, r, or flip branch selectors.</p>
+  </div>
+
+  <div class="coords-display" id="coordsDisplay">x: &mdash; &nbsp; y: &mdash;</div>
+  <div class="corner-mark">ANANDAN IYER 240117</div>
+</div>
+
+<script>
+// ── Complex helpers ──────────────────────────────────────────────────────────
+const C = {
+  add:  (a,b)=>({r:a.r+b.r,i:a.i+b.i}),
+  sub:  (a,b)=>({r:a.r-b.r,i:a.i-b.i}),
+  mul:  (a,b)=>({r:a.r*b.r-a.i*b.i,i:a.r*b.i+a.i*b.r}),
+  div:  (a,b)=>{const d=b.r*b.r+b.i*b.i;return{r:(a.r*b.r+a.i*b.i)/d,i:(a.i*b.r-a.r*b.i)/d};},
+  conj: a=>({r:a.r,i:-a.i}),
+  abs:  a=>Math.sqrt(a.r*a.r+a.i*a.i),
+  arg:  a=>Math.atan2(a.i,a.r),
+  exp:  th=>({r:Math.cos(th),i:Math.sin(th)}),
+  scale:(a,s)=>({r:a.r*s,i:a.i*s}),
+  from: (r,i=0)=>({r,i}),
+};
+
+function matSolve2(A,b){
+  const det=C.sub(C.mul(A[0][0],A[1][1]),C.mul(A[0][1],A[1][0]));
+  return[
+    C.div(C.sub(C.mul(b[0],A[1][1]),C.mul(b[1],A[0][1])),det),
+    C.div(C.sub(C.mul(A[0][0],b[1]),C.mul(A[1][0],b[0])),det),
+  ];
+}
+
+// ── Burmester synthesis ──────────────────────────────────────────────────────
+function burmester4(R,phi,gam2,mp){
+  const delta=R.map(r=>C.sub(r,R[0]));
+  const e2m=C.sub(C.exp(phi[1]),C.from(1));
+  const e3m=C.sub(C.exp(phi[2]),C.from(1));
+  const e4m=C.sub(C.exp(phi[3]),C.from(1));
+  const D2=C.sub(C.mul(delta[2],e4m),C.mul(delta[3],e3m));
+  const D3=C.sub(C.mul(delta[3],e2m),C.mul(delta[1],e4m));
+  const D4=C.sub(C.mul(delta[1],e3m),C.mul(delta[2],e2m));
+  const eg2m=C.sub(C.exp(gam2),C.from(1));
+  const D1=C.sub(C.sub(C.mul(eg2m,D2),D3),D4);
+  const cd=C.mul(C.conj(D1),D3);
+  const A=cd.r,B=cd.i;
+  const Cv=D1.r*D1.r+D1.i*D1.i+D3.r*D3.r+D3.i*D3.i-(D4.r*D4.r+D4.i*D4.i);
+  const disc=4*A*A+4*B*B-Cv*Cv;
+  if(disc<0) return null;
+  const sq=Math.sqrt(disc);
+  const gam33=2*Math.atan2(2*B-sq,Cv-2*A);
+  const qr=C.div(C.add(D1,C.mul(C.exp(gam33),D3)),C.scale(D4,-1));
+  const gam44=Math.atan2(qr.i,qr.r);
+  const AA=[[C.sub(C.exp(phi[1]),C.from(1)),C.sub(C.exp(gam2),C.from(1))],
+            [C.sub(C.exp(phi[2]),C.from(1)),C.sub(C.exp(gam33),C.from(1))]];
+  const DYAD=matSolve2(AA,[delta[1],delta[2]]);
+  let Z2,Z3,GAM,PHI;
+  if(mp===1){ Z2=DYAD[1];Z3=DYAD[0];GAM=[0,gam2,gam33,gam44];PHI=phi; }
+  else       { Z2=DYAD[0];Z3=DYAD[1];PHI=[0,gam2,gam33,gam44];GAM=phi; }
+  return {Z0:C.sub(C.sub(R[0],Z2),Z3),Z2,Z3,GAM,PHI};
+}
+
+// ── Position analysis ────────────────────────────────────────────────────────
+function foBarPos(Z0,Z2,Z5,Z0p,Z4,Z6,TH){
+  const Z1=C.sub(Z0p,Z0),Z3=C.sub(Z5,Z6);
+  const Z2n=C.mul(Z2,C.exp(TH)),CC=C.sub(Z1,Z2n);
+  const A=C.abs(Z3),G0=C.arg(Z3),B=C.abs(Z4),P0=C.arg(Z4),Cm=C.abs(CC),TC=C.arg(CC);
+  const cB=(Cm*Cm+B*B-A*A)/(2*B*Cm),cA=(Cm*Cm+A*A-B*B)/(2*A*Cm);
+  let isB=Math.abs(cB)>1||Math.abs(cA)>1;
+  let imR=0;
+  if(isB){
+    let mC=Math.max(Math.abs(cB),Math.abs(cA));
+    imR=Math.log(mC+Math.sqrt(mC*mC-1));
+  }
+  let scB=Math.max(-1,Math.min(1,cB)),scA=Math.max(-1,Math.min(1,cA));
+  const w=x=>{while(x>Math.PI)x-=2*Math.PI;while(x<-Math.PI)x+=2*Math.PI;return x;};
+  const PS=[w(TC-Math.acos(scB)+Math.PI-P0),w(TC+Math.acos(scB)+Math.PI-P0)];
+  const GM=[w(TC+Math.acos(scA)-G0),w(TC-Math.acos(scA)-G0)];
+  const ind=(Math.abs(PS[0]-P0)+Math.abs(GM[0]-G0))<=(Math.abs(PS[1]-P0)+Math.abs(GM[1]-G0))?0:1;
+  return{Z2n,Z5n:C.mul(Z5,C.exp(GM[ind])),Z4n:C.mul(Z4,C.exp(PS[ind])),isB,imR};
+}
+
+function getGrashof(Z0,Z2,Z3,Z0p,Z4,Z6){
+  let g=C.abs(C.sub(Z0p,Z0));
+  let iL=C.abs(Z2);
+  let c=C.abs(C.sub(Z3,Z6));
+  let oL=C.abs(Z4);
+  let L=[{t:"G",l:g},{t:"I",l:iL},{t:"C",l:c},{t:"O",l:oL}];
+  L.sort((a,b)=>a.l-b.l);
+  let isG=(L[0].l+L[3].l)<=(L[1].l+L[2].l);
+  if(!isG)return "Non-Grashof: Triple-Rocker";
+  if(L[0].t==="G")return "Grashof: Double-Crank";
+  if(L[0].t==="I")return "Grashof: Crank-Rocker";
+  if(L[0].t==="O")return "Grashof: Rocker-Crank";
+  return "Grashof: Double-Rocker";
+}
+
+function checkDefect(sol){
+  let G=sol.GAM1.slice();
+  let mImR=0,hasD=false,steps=100;
+  for(let i=0;i<4;i++){
+    let sA=G[i],eA=G[(i+1)%4],dA=eA-sA;
+    while(dA>Math.PI)dA-=2*Math.PI;
+    while(dA<-Math.PI)dA+=2*Math.PI;
+    let sB=false,lB=false,lImS=0,lImL=0;
+    for(let j=0;j<=steps;j++){
+      let p=foBarPos(sol.d1,sol.Z2_D1,sol.Z3_D1,sol.d2,sol.Z2_D2,sol.Z3_D2,sA+dA*(j/steps));
+      if(p.isB)sB=true;
+      if(p.isB&&p.imR>lImS)lImS=p.imR;
+    }
+    let lA=dA>0?dA-2*Math.PI:dA+2*Math.PI;
+    for(let j=0;j<=steps;j++){
+      let p=foBarPos(sol.d1,sol.Z2_D1,sol.Z3_D1,sol.d2,sol.Z2_D2,sol.Z3_D2,sA+lA*(j/steps));
+      if(p.isB)lB=true;
+      if(p.isB&&p.imR>lImL)lImL=p.imR;
+    }
+    if(sB&&lB){
+      hasD=true;
+      let mI=Math.min(lImS,lImL);
+      if(mI>mImR)mImR=mI;
+    }
+  }
+  return{hasD,mImR};
+}
+
+// ── State ────────────────────────────────────────────────────────────────────
+let points=[],solution=null,animating=false;
+let viewOX=0,viewOY=0,viewScale=42;
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+const toCanvas=(cx,cy)=>[canvas.width/2+(cx-viewOX)*viewScale,canvas.height/2-(cy-viewOY)*viewScale];
+const toWorld=(px,py)=>[(px-canvas.width/2)/viewScale+viewOX,-(py-canvas.height/2)/viewScale+viewOY];
+
+function resize(){const w=canvas.parentElement;canvas.width=w.clientWidth;canvas.height=w.clientHeight;render();}
+window.addEventListener('resize',resize);
+
+// ── Build phi sliders ────────────────────────────────────────────────────────
+const PHI_DEF=[0,12,34,84];
+const PHI_LBL=['&phi;&#8321; (ref = 0&deg;)','&phi;&#8322;','&phi;&#8323;','&phi;&#8324;'];
+
+function buildPhiSliders(){
+  const c=document.getElementById('phiSliders');
+  c.innerHTML='';
+  PHI_DEF.forEach((def,idx)=>{
+    const fixed=idx===0;
+    const row=document.createElement('div');
+    row.className='slider-row';
+    row.innerHTML=`
+      <div class="slider-header">
+        <label>${PHI_LBL[idx]}</label>
+        <span class="slider-val" id="phi${idx+1}Val">${def}&deg;</span>
+      </div>
+      <input type="range" id="phi${idx+1}Slider" min="-180" max="180" value="${def}"
+        style="--track-color:var(--blue)"
+        ${fixed?'disabled':''}
+        oninput="onSliderChange('phi${idx+1}Slider','phi${idx+1}Val','var(--blue)',true)">
+      <div class="slider-ticks">
+        <span>-180&deg;</span><span>-90&deg;</span><span>0&deg;</span><span>90&deg;</span><span>180&deg;</span>
+      </div>`;
+    c.appendChild(row);
+  });
+}
+
+// ── Slider fill update ───────────────────────────────────────────────────────
+function updateFill(el,color){
+  const min=parseFloat(el.min),max=parseFloat(el.max),val=parseFloat(el.value);
+  const pct=((val-min)/(max-min)*100).toFixed(1)+'%';
+  const col=color==='var(--blue)'?'#1a4a8c':color==='var(--red)'?'#8c2a1a':'#1a4a8c';
+  el.style.background=`linear-gradient(to right,${col} ${pct},#b8aa88 ${pct})`;
+}
+
+function onSliderChange(slId,valId,color,resolveAndSolve){
+  const sl=document.getElementById(slId);
+  document.getElementById(valId).textContent=sl.value+'°';
+  updateFill(sl,color);
+  if(resolveAndSolve&&points.length===4) solve();
+  if(!resolveAndSolve&&points.length===4) solve(); 
+}
+
+function initSliders(){
+  document.querySelectorAll('input[type=range]').forEach(sl=>{
+    const color=sl.style.getPropertyValue('--track-color')||'var(--blue)';
+    updateFill(sl,color);
+  });
+}
+
+// ── Drawing ──────────────────────────────────────────────────────────────────
+function drawGrid(){
+  const W=canvas.width,H=canvas.height;
+  const[x0w,y0w]=toWorld(0,0),[x1w,y1w]=toWorld(W,H);
+  const step=viewScale>=35?1:viewScale>=18?2:5;
+  const minX=Math.floor(Math.min(x0w,x1w)/step)*step;
+  const maxX=Math.ceil(Math.max(x0w,x1w)/step)*step;
+  const minY=Math.floor(Math.min(y0w,y1w)/step)*step;
+  const maxY=Math.ceil(Math.max(y0w,y1w)/step)*step;
+
+  ctx.strokeStyle='rgba(158,144,112,0.38)';ctx.lineWidth=0.5;
+  for(let x=minX;x<=maxX;x+=step){const[cx]=toCanvas(x,0);ctx.beginPath();ctx.moveTo(cx,0);ctx.lineTo(cx,H);ctx.stroke();}
+  for(let y=minY;y<=maxY;y+=step){const[,cy]=toCanvas(0,y);ctx.beginPath();ctx.moveTo(0,cy);ctx.lineTo(W,cy);ctx.stroke();}
+
+  const big=step*5;
+  ctx.strokeStyle='rgba(110,90,55,0.45)';ctx.lineWidth=0.8;
+  for(let x=Math.floor(minX/big)*big;x<=maxX;x+=big){const[cx]=toCanvas(x,0);ctx.beginPath();ctx.moveTo(cx,0);ctx.lineTo(cx,H);ctx.stroke();}
+  for(let y=Math.floor(minY/big)*big;y<=maxY;y+=big){const[,cy]=toCanvas(0,y);ctx.beginPath();ctx.moveTo(0,cy);ctx.lineTo(W,cy);ctx.stroke();}
+
+  ctx.strokeStyle='rgba(70,55,30,0.65)';ctx.lineWidth=1.2;
+  const[axX]=toCanvas(0,0);ctx.beginPath();ctx.moveTo(axX,0);ctx.lineTo(axX,H);ctx.stroke();
+  const[,axY]=toCanvas(0,0);ctx.beginPath();ctx.moveTo(0,axY);ctx.lineTo(W,axY);ctx.stroke();
+
+  ctx.fillStyle='rgba(70,55,30,0.5)';ctx.font='10px Courier Prime';
+  ctx.textAlign='center';
+  for(let x=Math.floor(minX/big)*big;x<=maxX;x+=big){
+    if(x===0)continue;const[cx,cy]=toCanvas(x,0);ctx.fillText(x,cx,cy+13);
+  }
+  ctx.textAlign='right';
+  for(let y=Math.floor(minY/big)*big;y<=maxY;y+=big){
+    if(y===0)continue;const[cx,cy]=toCanvas(0,y);ctx.fillText(y,cx-6,cy+4);
+  }
+}
+
+function line(a,b,col,w=2,dash=[]){
+  const[x1,y1]=toCanvas(a.r,a.i),[x2,y2]=toCanvas(b.r,b.i);
+  ctx.save();ctx.strokeStyle=col;ctx.lineWidth=w;ctx.setLineDash(dash);
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();ctx.restore();
+}
+
+function circle(p,r,fill,stroke,sw=1.5){
+  const[cx,cy]=toCanvas(p.r,p.i);
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+  ctx.fillStyle=fill;ctx.fill();ctx.strokeStyle=stroke;ctx.lineWidth=sw;ctx.stroke();
+}
+
+function crosshair(p,col,s=10){
+  const[cx,cy]=toCanvas(p.r,p.i);
+  ctx.save();ctx.strokeStyle=col;ctx.lineWidth=1.8;
+  ctx.beginPath();ctx.moveTo(cx-s,cy);ctx.lineTo(cx+s,cy);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx,cy-s);ctx.lineTo(cx,cy+s);ctx.stroke();
+  ctx.beginPath();ctx.arc(cx,cy,s*0.45,0,Math.PI*2);ctx.stroke();
+  ctx.restore();
+}
+
+function pivot(p,col){
+  const[cx,cy]=toCanvas(p.r,p.i);
+  ctx.save();ctx.translate(cx,cy);
+  ctx.beginPath();ctx.moveTo(0,-11);ctx.lineTo(-9,8);ctx.lineTo(9,8);ctx.closePath();
+  ctx.fillStyle='rgba(212,201,168,0.92)';ctx.fill();ctx.strokeStyle=col;ctx.lineWidth=2;ctx.stroke();
+  for(let dx=-8;dx<=8;dx+=4){ctx.beginPath();ctx.moveTo(dx,8);ctx.lineTo(dx-4,14);ctx.stroke();}
+  ctx.beginPath();ctx.arc(0,-11,4,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();
+  ctx.restore();
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function renderA(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#d4c9a8';ctx.fillRect(0,0,canvas.width,canvas.height);
+  drawGrid();
+
+  // precision pts
+  points.forEach((p,i)=>{
+    ctx.globalAlpha=0.18;circle(p,18,'transparent','#8c2a1a',1);ctx.globalAlpha=1;
+    crosshair(p,'#8c2a1a',10);
+    const[cx,cy]=toCanvas(p.r,p.i);
+    ctx.fillStyle='#8c2a1a';ctx.font='bold 10px Courier Prime';ctx.textAlign='left';
+    ctx.fillText(`P${i+1}(${p.r.toFixed(1)},${p.i.toFixed(1)})`,cx+14,cy-8);
+  });
+
+  if(!solution){return;}
+  const{d1,d2,Z2_D1,Z3_D1,Z2_D2,Z3_D2,GAM1,PHI1,GAM2,PHI2}=solution;
+
+  if(!animating){
+    for(let ii=0;ii<4;ii++){
+      ctx.globalAlpha=ii===0?0.92:0.38;
+      const a1=C.mul(Z2_D1,C.exp(GAM1[ii]));
+      const b1=C.add(C.add(d1,a1),C.mul(Z3_D1,C.exp(PHI1[ii])));
+      line(d1,C.add(d1,a1),'#1a4a8c',2.5);
+      line(C.add(d1,a1),b1,'#1a4a8c',1.5,[5,3]);
+      circle(C.add(d1,a1),5,'#d4c9a8','#1a4a8c',1.8);
+      const a2=C.mul(Z2_D2,C.exp(GAM2[ii]));
+      const b2=C.add(C.add(d2,a2),C.mul(Z3_D2,C.exp(PHI2[ii])));
+      line(d2,C.add(d2,a2),'#8c2a1a',2.5);
+      line(C.add(d2,a2),b2,'#8c2a1a',1.5,[5,3]);
+      circle(C.add(d2,a2),5,'#d4c9a8','#8c2a1a',1.8);
+      ctx.globalAlpha=1;
+    }
+    pivot(d1,'#1a4a8c');pivot(d2,'#8c2a1a');
+  }
+
+  if(animating||solution.animFrame){
+    const pos=foBarPos(d1,Z2_D1,Z3_D1,d2,Z2_D2,Z3_D2,solution.animTH||0);
+    if(pos&&!pos.isB){
+      const{Z2n,Z5n,Z4n}=pos;
+      const A=C.add(d1,Z2n),B=C.add(d2,Z4n),Mp=C.add(A,Z5n);
+
+      if(!solution.path)solution.path=[];
+      if(animating)solution.path.push(Mp);
+      if(solution.path.length>400)solution.path.shift();
+
+      if(solution.path.length>1){
+        ctx.save();ctx.strokeStyle='rgba(140,42,26,0.6)';ctx.lineWidth=1.5;ctx.setLineDash([4,4]);
+        ctx.beginPath();
+        const[sx,sy]=toCanvas(solution.path[0].r,solution.path[0].i);
+        ctx.moveTo(sx,sy);
+        for(let i=1;i<solution.path.length;i++){
+          const[px,py]=toCanvas(solution.path[i].r,solution.path[i].i);
+          ctx.lineTo(px,py);
+        }
+        ctx.stroke();ctx.restore();
+      }
+
+      ctx.save();ctx.fillStyle='rgba(42,110,42,0.2)';ctx.beginPath();
+      const[ax,ay]=toCanvas(A.r,A.i),[bx,by]=toCanvas(B.r,B.i),[cx,cy]=toCanvas(Mp.r,Mp.i);
+      ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.lineTo(cx,cy);ctx.closePath();ctx.fill();ctx.restore();
+
+      line(d1,d2,'#8a7a58',3,[7,5]);
+      line(d1,A,'#1a4a8c',5);
+      line(d2,B,'#8c2a1a',5);
+      line(A,B,'#2a6e2a',4);
+      line(A,Mp,'#2a6e2a',4);
+      line(B,Mp,'#2a6e2a',4);
+      
+      pivot(d1,'#1a4a8c');pivot(d2,'#8c2a1a');
+      circle(A,7,'#d4c9a8','#1a4a8c',2.5);
+      circle(B,7,'#d4c9a8','#8c2a1a',2.5);
+      crosshair(Mp,'#8c2a1a',7);
+      circle(Mp,4,'#8c2a1a','#2b2415',1.5);
+    }
+  }
+
+  points.forEach((p,i)=>{
+    crosshair(p,'#8c2a1a',9);
+    const[cx,cy]=toCanvas(p.r,p.i);
+    ctx.fillStyle='#8c2a1a';ctx.font='bold 10px Courier Prime';ctx.textAlign='left';
+    ctx.fillText(`P${i+1}`,cx+13,cy-8);
+  });
+}
+
+// ── Animation ────────────────────────────────────────────────────────────────
+function toggleAnim(){
+  if(!solution)return;
+  animating=!animating;
+  document.getElementById('animBtn').innerHTML=animating?'&#9646;&#9646; Pause':'&#9654; Animate';
+  if(animating) animLoop();
+}
+
+
+// ── UI ───────────────────────────────────────────────────────────────────────
+function updatePointList(){
+  return updatePointListA(); }
+function updatePointListA(){
+  const list=document.getElementById('pointList');list.innerHTML='';
+  for(let i=0;i<4;i++){
+    const p=points[i];
+    const div=document.createElement('div');div.className='point-item';
+    const dot=document.createElement('div');dot.className='point-dot'+(p?'':' empty');
+    const txt=document.createElement('div');txt.className='point-coords'+(p?'':' empty');
+    txt.innerHTML=p?`P${i+1} &rarr; (${p.r.toFixed(2)}, ${p.i.toFixed(2)})`:
+                    `P${i+1} &mdash; click on canvas`;
+    div.appendChild(dot);div.appendChild(txt);list.appendChild(div);
+  }
+  document.getElementById('solveBtn').disabled=points.length<4;
+}
+
+function setStatus(msg,type=''){ return setStatusA(msg,type); }
+function setStatusA(msg,type=''){
+  document.getElementById('statusBox').innerHTML=msg?`<span class="status-tag ${type}">${msg}</span>`:'';
+}
+
+function getPhi(){
+  return[1,2,3,4].map(i=>parseFloat(document.getElementById(`phi${i}Slider`).value)*Math.PI/180);
+}
+
+function getGrashofCondition(groundPivot1,inputVector,couplerVec1,groundPivot2,outputVector,couplerVec2){
+  let groundLength=C.abs(C.sub(groundPivot2,groundPivot1));
+  let inputLength=C.abs(inputVector);
+  let couplerLength=C.abs(C.sub(couplerVec1,couplerVec2));
+  let outputLength=C.abs(outputVector);
+  let links=[{type:"Ground",length:groundLength},{type:"Input",length:inputLength},{type:"Coupler",length:couplerLength},{type:"Output",length:outputLength}];
+  links.sort((firstLink,secondLink)=>firstLink.length-secondLink.length);
+  let shortestLink=links[0];
+  let longestLink=links[3];
+  let intermediateLink1=links[1];
+  let intermediateLink2=links[2];
+  let isGrashof=(shortestLink.length+longestLink.length)<=(intermediateLink1.length+intermediateLink2.length);
+  if(!isGrashof) return "Non-Grashof: Triple-Rocker";
+  if(shortestLink.type==="Ground") return "Grashof: Double-Crank";
+  if(shortestLink.type==="Input") return "Grashof: Crank-Rocker";
+  if(shortestLink.type==="Output") return "Grashof: Rocker-Crank";
+  if(shortestLink.type==="Coupler") return "Grashof: Double-Rocker";
+  return "Unknown Type";
+}
+
+function solve(){
+  const R=points.slice(0,4),phi=getPhi();
+  const g1=parseFloat(document.getElementById('gam1Slider').value)*Math.PI/180;
+  const g2=parseFloat(document.getElementById('gam2Slider').value)*Math.PI/180;
+  const r1=burmester4(R,phi,g1,1),r2=burmester4(R,phi,g2,1);
+  if(!r1||!r2){setStatus('Synthesis failed &mdash; adjust angles','error');solution=null;render();return;}
+  const ok=v=>isFinite(v.r)&&isFinite(v.i)&&!isNaN(v.r)&&!isNaN(v.i);
+  if(!ok(r1.Z0)||!ok(r1.Z2)||!ok(r1.Z3)||!ok(r2.Z0)||!ok(r2.Z2)||!ok(r2.Z3)){
+    setStatus('Degenerate &mdash; try different &gamma; angles','error');solution=null;render();return;
+  }
+  solution={
+    d1:r1.Z0,Z2_D1:r1.Z2,Z3_D1:r1.Z3,GAM1:r1.GAM,PHI1:r1.PHI,
+    d2:r2.Z0,Z2_D2:r2.Z2,Z3_D2:r2.Z3,GAM2:r2.GAM,PHI2:r2.PHI,
+    animTH:0,animFrame:false,path:[],dir:1
+  };
+  let cls=getGrashof(solution.d1,solution.Z2_D1,solution.Z3_D1,solution.d2,solution.Z2_D2,solution.Z3_D2);
+  let def=checkDefect(solution);
+  let txt=def.hasD?` | CIRCUIT DEFECT (Imag: ${def.mImR.toFixed(4)}i)`:' | Valid Path';
+  document.getElementById('animBtn').disabled=false;
+  setStatus(`Linkage synthesized &#10003; | ${cls}${txt}`,'info');
+  if(def.hasD)document.querySelector('.status-tag').classList.add('error');
+  render();
+}
+
+function animLoop(){
+  if(!animating)return;
+  if(!solution.dir)solution.dir=1;
+  let nTH=(solution.animTH||0)+solution.dir*0.013;
+  let pos=foBarPos(solution.d1,solution.Z2_D1,solution.Z3_D1,solution.d2,solution.Z2_D2,solution.Z3_D2,nTH);
+  if(pos.isB)solution.dir*=-1;
+  if(pos.isB)nTH=(solution.animTH||0)+solution.dir*0.013;
+  solution.animTH=nTH;
+  solution.animFrame=true;
+  render();requestAnimationFrame(animLoop);
+}
+
+function clearPoints(){ clearPointsA(); }
+function clearPointsA(){
+  points=[];solution=null;animating=false;
+  document.getElementById('animBtn').innerHTML='&#9654; Animate';
+  document.getElementById('animBtn').disabled=true;
+  document.getElementById('solveBtn').disabled=true;
+  setStatus('');updatePointList();render();
+}
+
+
+// ── RENDER DISPATCHER ──────────────────────────────────────────────────────
+function render(){
+  if(currentMode==='A') renderA();
+  else if(currentMode==='G') gRender();
+  else g5Render();
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// MODE STATE
+// ═══════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════
+// MODE STATE
+// ═══════════════════════════════════════════════════════════════════
+let currentMode = 'A';
+
+function setMode(m) {
+  currentMode = m;
+  document.getElementById('sidebarA').style.display  = m==='A'  ? 'flex' : 'none';
+  document.getElementById('sidebarG').style.display  = m==='G'  ? 'flex' : 'none';
+  document.getElementById('sidebarG5').style.display = m==='G5' ? 'flex' : 'none';
+  document.getElementById('legendA').style.display   = m==='A'  ? 'flex' : 'none';
+  document.getElementById('legendG').style.display   = m==='G'  ? 'flex' : 'none';
+  document.getElementById('legendG5').style.display  = m==='G5' ? 'flex' : 'none';
+  document.getElementById('tabA').className  = 'mode-tab'+(m==='A' ?' active':'');
+  document.getElementById('tabG').className  = 'mode-tab'+(m==='G' ?' active':'');
+  document.getElementById('tabG5').className = 'mode-tab'+(m==='G5'?' active':'');
+  if(animating){animating=false;document.getElementById('animBtn').innerHTML='&#9654; Animate';}
+  if(m==='G5'){ g5Update(); g5Render(); }
+  else if(m==='G'){ gRender(); }
+  else render();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// GRAPHICAL MODULE — Point Position Reduction (correct algorithm)
+// Four-bar: H_C (crank pivot, fixed) → A → coupler(C tracer) → B → H_R (rocker pivot, fixed)
+// B1 is COMPUTED via inversion of similar triangles, NOT placed by user.
+// ═══════════════════════════════════════════════════════════════════
+
+// --- Graphical State ---
+let gHR_t = 0, gHC_t = -5;
+let gR = 3, gr = 2.5;
+let gBranchA1 = 0, gBranchA3 = 0, gBranchB = 0;
+let gHR = null, gHC = null;
+let gc13 = null, ga13 = null;
+let gA = [null,null,null,null];
+let gP2 = null, gP4 = null;   // inverted H_R positions from inversion step
+let gB1 = null;                // computed B1 = circumcenter(P2, HR, P4)
+let gCrankR = 0;               // crank length |H_C – A1|
+let gCouplerL = 0;             // coupler length |A1 – B1|
+let gRockerL = 0;              // rocker length |H_R – B1|
+let gAnimating = false, gCrankAngle = 0, gAnimDir = 1;
+let gPath = [];
+let gDragTarget = null;
+let gLastB = null;
+let pointsG = [];              // precision points in graphical mode (world {x,y})
+
+// --- 2D Geometry Helpers ---
+function midNormal(P1, P2) {
+  const mx=(P1.x+P2.x)/2, my=(P1.y+P2.y)/2;
+  const dx=P2.x-P1.x, dy=P2.y-P1.y, len=Math.sqrt(dx*dx+dy*dy);
+  if(len<1e-9) return null;
+  return {mid:{x:mx,y:my}, dir:{x:-dy/len, y:dx/len}};
+}
+function linePoint(ln, t) { return {x:ln.mid.x+t*ln.dir.x, y:ln.mid.y+t*ln.dir.y}; }
+function projLine(ln, P)  { return (P.x-ln.mid.x)*ln.dir.x + (P.y-ln.mid.y)*ln.dir.y; }
+function d2(A,B) { return Math.sqrt((A.x-B.x)**2+(A.y-B.y)**2); }
+
+function circleXcircle(c1,r1,c2,r2) {
+  const dx=c2.x-c1.x, dy=c2.y-c1.y, D=Math.sqrt(dx*dx+dy*dy);
+  if(D>r1+r2+1e-9||D<Math.abs(r1-r2)-1e-9||D<1e-9) return [];
+  const a=(r1*r1-r2*r2+D*D)/(2*D);
+  const h2=r1*r1-a*a; if(h2<0) return [];
+  const h=Math.sqrt(Math.max(0,h2));
+  const mx=c1.x+a*dx/D, my=c1.y+a*dy/D;
+  return [
+    {x:mx+h*dy/D, y:my-h*dx/D},
+    {x:mx-h*dy/D, y:my+h*dx/D}
+  ];
+}
+
+function circumcenter(p1,p2,p3) {
+  const d = 2*(p1.x*(p2.y-p3.y)+p2.x*(p3.y-p1.y)+p3.x*(p1.y-p2.y));
+  if(Math.abs(d)<1e-6) return null;
+  const m1=p1.x*p1.x+p1.y*p1.y, m2=p2.x*p2.x+p2.y*p2.y, m3=p3.x*p3.x+p3.y*p3.y;
+  return {
+    x:(m1*(p2.y-p3.y)+m2*(p3.y-p1.y)+m3*(p1.y-p2.y))/d,
+    y:(m1*(p3.x-p2.x)+m2*(p1.x-p3.x)+m3*(p2.x-p1.x))/d
+  };
+}
+
+// Rigid-body transform: takes point p defined relative to frame (fP1→fP2),
+// maps it to the equivalent position in frame (tP1→tP2).
+// This is the core "inversion on follower" operation from PPR.
+function rigidTransform(p, fP1, fP2, tP1, tP2) {
+  const aF = Math.atan2(fP2.y-fP1.y, fP2.x-fP1.x);
+  const aT = Math.atan2(tP2.y-tP1.y, tP2.x-tP1.x);
+  const da = aT - aF;
+  const vx = p.x-fP1.x, vy = p.y-fP1.y;
+  return {
+    x: tP1.x + vx*Math.cos(da) - vy*Math.sin(da),
+    y: tP1.y + vx*Math.sin(da) + vy*Math.cos(da)
+  };
+}
+
+function gSetBadge(id, type, text) {
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.className = 'g-badge g-badge-'+type;
+  el.textContent = text;
+  const row = el.closest('.g-step-row');
+  if(row) row.classList.toggle('done', type==='ok');
+}
+
+// --- Main graphical computation ---
+function gUpdate() {
+  // Reset computed values
+  gHR=null; gHC=null; gc13=null; ga13=null;
+  gA=[null,null,null,null];
+  gP2=null; gP4=null; gB1=null;
+  gCrankR=0; gCouplerL=0; gRockerL=0;
+  document.getElementById('animBtnG').disabled=true;
+
+  if(pointsG.length<4) {
+    gSetBadge('badge1','pend','WAIT'); gSetBadge('badge2','pend','WAIT');
+    gSetBadge('badge3','pend','WAIT'); gSetBadge('badge4','pend','WAIT');
+    gSetBadge('badge5','pend','WAIT'); gSetBadge('badge6','pend','WAIT');
+    gUpdatePanel(); gRender(); return;
+  }
+
+  const [C1,C2,C3,C4] = pointsG;
+
+  // Step 1-2: perpendicular bisector c13 of C1-C3, H_R on it
+  gc13 = midNormal(C1, C3);
+  if(!gc13) { gSetBadge('badge1','err','C1=C3'); gRender(); return; }
+  gHR = linePoint(gc13, gHR_t);
+  gSetBadge('badge1','ok','OK');
+
+  // Step 3-4: A1 = circleXcircle(H_R,R) ∩ circleXcircle(C1,r)
+  //           A3 = circleXcircle(H_R,R) ∩ circleXcircle(C3,r)
+  const a1opts = circleXcircle(gHR, gR, C1, gr);
+  const a3opts = circleXcircle(gHR, gR, C3, gr);
+  if(!a1opts.length || !a3opts.length) {
+    gSetBadge('badge2','err','NO INT'); gRender(); return;
+  }
+  gA[0] = a1opts[gBranchA1 % a1opts.length];
+  // Mirror A1 across c13 to get the consistent A3 branch
+  const a1mir = mirrorAcrossLine(gA[0], gc13);
+  gA[2] = a3opts.reduce((best,p)=>d2(p,a1mir)<d2(best,a1mir)?p:best, a3opts[0]);
+  gSetBadge('badge2','ok','OK');
+
+  // Step 5-6: perpendicular bisector a13 of A1-A3, H_C on it
+  ga13 = midNormal(gA[0], gA[2]);
+  if(!ga13) { gSetBadge('badge3','err','A1=A3'); gRender(); return; }
+  gHC = linePoint(ga13, gHC_t);
+  gCrankR = d2(gHC, gA[0]);
+  if(gCrankR < 0.05) { gSetBadge('badge3','err','H_C≈A1'); gRender(); return; }
+  gSetBadge('badge3','ok','OK');
+
+  // Step 7-9: crank circle intersects arcs from C2, C4
+  const a2opts = circleXcircle(gHC, gCrankR, C2, gr);
+  const a4opts = circleXcircle(gHC, gCrankR, C4, gr);
+  if(!a2opts.length || !a4opts.length) {
+    gSetBadge('badge4','err','NO INT'); gRender(); return;
+  }
+  gA[1] = a2opts[gBranchB % a2opts.length];
+  gA[3] = a4opts[gBranchB % a4opts.length];
+  gSetBadge('badge4','ok','OK');
+
+  // Step 10: Inversion on follower
+  // P2 = rigidTransform(H_R; frame C2→A2, target C1→A1)  [△C2A2H_R ≅ △C1A1·P2]
+  // P4 = rigidTransform(H_R; frame C4→A4, target C1→A1)  [△C4A4H_R ≅ △C1A1·P4]
+  gP2 = rigidTransform(gHR, C2, gA[1], C1, gA[0]);
+  gP4 = rigidTransform(gHR, C4, gA[3], C1, gA[0]);
+  gSetBadge('badge5','ok','P2,P4 ✓');
+
+  // Step 11: B1 = circumcenter(P2, H_R, P4)
+  gB1 = circumcenter(gP2, gHR, gP4);
+  if(!gB1) {
+    gSetBadge('badge6','err','COLLINEAR'); gRender();
+    setStatusG('P₂, H_R, P₄ are collinear. Adjust parameters.','error'); return;
+  }
+  gCouplerL = d2(gA[0], gB1);   // coupler A→B
+  gRockerL  = d2(gHR,   gB1);   // rocker H_R→B
+  gSetBadge('badge6','ok','B₁ ✓');
+  document.getElementById('animBtnG').disabled = false;
+  gUpdatePanel();
+
+  // Circuit defect scan
+  gScanDefect();
+  gRender();
+}
+
+function mirrorAcrossLine(P, ln) {
+  const t = projLine(ln, P);
+  const foot = linePoint(ln, t);
+  return {x: 2*foot.x - P.x, y: 2*foot.y - P.y};
+}
+
+function gScanDefect() {
+  if(!gHC||!gHR||!gB1||gCrankR<0.01||gCouplerL<0.01||gRockerL<0.01) return;
+  let locks=0, switches=0, total=360, prevB=null;
+  for(let k=0;k<=total;k++){
+    const th=k*2*Math.PI/total;
+    const Ax=gHC.x+gCrankR*Math.cos(th), Ay=gHC.y+gCrankR*Math.sin(th);
+    const bOpts=circleXcircle({x:Ax,y:Ay},gCouplerL,gHR,gRockerL);
+    if(!bOpts.length){locks++;continue;}
+    const B=prevB?bOpts.reduce((best,p)=>d2(p,prevB)<d2(best,prevB)?p:best,bOpts[0]):bOpts[0];
+    if(prevB&&d2(B,prevB)>gCouplerL*0.55) switches++;
+    prevB=B;
+  }
+  const hasDefect = switches>0 || locks>total*0.08;
+  const msg = hasDefect
+    ? (locks>0 ? '⚠ Non-Grashof: mechanism locks in some range' : '⚠ Circuit defect: branch switch detected')
+    : '✓ No circuit defect — mechanism is valid';
+  setStatusG(msg, hasDefect?'warn':'');
+  document.getElementById('defectBanner').style.display = hasDefect?'flex':'none';
+  if(hasDefect){
+    document.getElementById('defectType').textContent = locks>0?'⚠ Non-Grashof Region':'⚠ Circuit Defect';
+    document.getElementById('defectDetail').textContent = locks>0
+      ? 'Mechanism locks; consider adjusting H_C or r.'
+      : 'Mechanism flips branch; adjust H_C, R, r, or flip branch selectors.';
+  }
+}
+
+function gUpdatePanel() {
+  const fmt = p => p ? `(${p.x.toFixed(2)}, ${p.y.toFixed(2)})` : '—';
+  const fN  = v => isFinite(v) ? v.toFixed(3) : '—';
+  document.getElementById('gHCcoords').textContent    = fmt(gHC);
+  document.getElementById('gHRcoords').textContent    = fmt(gHR);
+  document.getElementById('gCrankLen').textContent    = fN(gCrankR);
+  document.getElementById('gRockerLen').textContent   = fN(gRockerL);
+  const ground = (gHC&&gHR) ? fN(d2(gHC,gHR)) : '—';
+  document.getElementById('gGroundLen').textContent   = ground;
+  document.getElementById('gGrashof').textContent     = gGrashofStr();
+}
+
+function gGrashofStr() {
+  if(!gHC||!gHR||!gB1||gCrankR===0) return '—';
+  const Lg=d2(gHC,gHR), links=[gCrankR,gCouplerL,gRockerL,Lg].sort((a,b)=>a-b);
+  return (links[0]+links[3])<=(links[1]+links[2])
+    ? 'Grashof ✓' : 'Non-Grashof';
+}
+
+// --- Forward kinematics: given crank angle, solve for B and tracer C ---
+function gFKin(theta) {
+  const Ax = gHC.x + gCrankR*Math.cos(theta);
+  const Ay = gHC.y + gCrankR*Math.sin(theta);
+  const A = {x:Ax, y:Ay};
+  const bOpts = circleXcircle(A, gCouplerL, gHR, gRockerL);
+  if(!bOpts.length) return null;
+  // Pick branch closest to last known B
+  const ref = gLastB || gB1;
+  const B = bOpts.reduce((best,p)=>d2(p,ref)<d2(best,ref)?p:best, bOpts[0]);
+  // Branch switch guard
+  if(gLastB && d2(B,gLastB)>gCouplerL*0.55) return null;
+  // Tracer via rigid body transform: C moves with coupler body (A→B frame)
+  const Coupler = rigidTransform(pointsG[0], gA[0], gB1, A, B);
+  return {A, B, Coupler};
+}
+
+// --- Animation ---
+function toggleAnimG() {
+  if(!gB1) return;
+  gAnimating = !gAnimating;
+  document.getElementById('animBtnG').innerHTML = gAnimating ? '&#9646;&#9646; Pause' : '&#9654; Animate Mechanism';
+  if(gAnimating) {
+    gPath=[]; gLastB=null;
+    gCrankAngle = Math.atan2(gA[0].y-gHC.y, gA[0].x-gHC.x);
+    animLoopG();
+  }
+}
+
+function animLoopG() {
+  if(!gAnimating) return;
+  gCrankAngle += gAnimDir * 0.018;
+  const pos = gFKin(gCrankAngle);
+  if(!pos) {
+    gAnimDir *= -1;
+    gCrankAngle += gAnimDir * 0.036;
+    requestAnimationFrame(animLoopG); return;
+  }
+  gLastB = pos.B;
+  if(pos.Coupler) { gPath.push({x:pos.Coupler.x,y:pos.Coupler.y}); if(gPath.length>700)gPath.shift(); }
+  gRender();
+  requestAnimationFrame(animLoopG);
+}
+
+// --- Rendering helpers (world-coord drawing on canvas) ---
+function wline(p1,p2,col,w=2,dash=[]) {
+  if(!p1||!p2) return;
+  const[x1,y1]=toCanvas(p1.x,p1.y),[x2,y2]=toCanvas(p2.x,p2.y);
+  ctx.save();ctx.strokeStyle=col;ctx.lineWidth=w;ctx.setLineDash(dash);
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();ctx.restore();
+}
+function wcircW(p,rWorld,fill,stroke,sw=1.5,dash=[]) {
+  if(!p||rWorld<=0) return;
+  const[cx,cy]=toCanvas(p.x,p.y);
+  ctx.save();ctx.strokeStyle=stroke||'transparent';ctx.lineWidth=sw;ctx.setLineDash(dash);
+  ctx.beginPath();ctx.arc(cx,cy,rWorld*viewScale,0,Math.PI*2);
+  if(fill){ctx.fillStyle=fill;ctx.fill();}ctx.stroke();ctx.restore();
+}
+function wdot(p,rPx,fill,stroke,sw=1.5) {
+  if(!p) return;
+  const[cx,cy]=toCanvas(p.x,p.y);
+  ctx.beginPath();ctx.arc(cx,cy,rPx,0,Math.PI*2);
+  if(fill){ctx.fillStyle=fill;ctx.fill();}
+  if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=sw;ctx.stroke();}
+}
+function wcross(p,col,s=10) {
+  if(!p) return;
+  const[cx,cy]=toCanvas(p.x,p.y);
+  ctx.save();ctx.strokeStyle=col;ctx.lineWidth=1.8;
+  ctx.beginPath();ctx.moveTo(cx-s,cy);ctx.lineTo(cx+s,cy);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx,cy-s);ctx.lineTo(cx,cy+s);ctx.stroke();
+  ctx.beginPath();ctx.arc(cx,cy,s*0.45,0,Math.PI*2);ctx.stroke();ctx.restore();
+}
+function wpivotXY(p,col) {
+  if(!p) return;
+  const[cx,cy]=toCanvas(p.x,p.y);
+  ctx.save();ctx.translate(cx,cy);
+  ctx.beginPath();ctx.moveTo(0,-13);ctx.lineTo(-10,10);ctx.lineTo(10,10);ctx.closePath();
+  ctx.fillStyle='rgba(212,201,168,0.93)';ctx.fill();ctx.strokeStyle=col;ctx.lineWidth=2;ctx.stroke();
+  for(let dx=-9;dx<=9;dx+=4.5){ctx.beginPath();ctx.moveTo(dx,10);ctx.lineTo(dx-4,17);ctx.stroke();}
+  ctx.beginPath();ctx.arc(0,-13,5,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();ctx.restore();
+}
+function wlabel(p,text,col,dx=14,dy=-9,bold=false) {
+  if(!p) return;
+  const[cx,cy]=toCanvas(p.x,p.y);
+  ctx.fillStyle=col;ctx.font=(bold?'bold ':'')+'11px Courier Prime';
+  ctx.textAlign='left';ctx.fillText(text,cx+dx,cy+dy);
+}
+function wInfLine(ln,col,w=1,dash=[]) {
+  if(!ln) return;
+  const W=canvas.width,H=canvas.height;
+  const[cpx,cpy]=toCanvas(ln.mid.x,ln.mid.y);
+  const cdx=ln.dir.x*viewScale, cdy=-ln.dir.y*viewScale;
+  let tmin=-1e5,tmax=1e5;
+  if(Math.abs(cdx)>1e-9){
+    const t1=(0-cpx)/cdx,t2=(W-cpx)/cdx;
+    tmin=Math.max(tmin,Math.min(t1,t2));tmax=Math.min(tmax,Math.max(t1,t2));
+  } else if(cpx<0||cpx>W) return;
+  if(Math.abs(cdy)>1e-9){
+    const t1=(0-cpy)/cdy,t2=(H-cpy)/cdy;
+    tmin=Math.max(tmin,Math.min(t1,t2));tmax=Math.min(tmax,Math.max(t1,t2));
+  } else if(cpy<0||cpy>H) return;
+  if(tmin>=tmax) return;
+  ctx.save();ctx.strokeStyle=col;ctx.lineWidth=w;ctx.setLineDash(dash);
+  ctx.beginPath();ctx.moveTo(cpx+tmin*cdx,cpy+tmin*cdy);ctx.lineTo(cpx+tmax*cdx,cpy+tmax*cdy);
+  ctx.stroke();ctx.restore();
+}
+
+// --- Main graphical render ---
+function gRender() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#d4c9a8';ctx.fillRect(0,0,canvas.width,canvas.height);
+  drawGrid();
+
+  // Construction elements
+  if(gc13) {
+    wInfLine(gc13,'rgba(26,74,140,0.35)',1,[8,5]);
+    const lp=linePoint(gc13,gHR_t+2); wlabel(lp,'c₁₃','#1a4a8c',-20,-8);
+  }
+  if(gHR) {
+    // H_R reference arc
+    wcircW(gHR,gR,'rgba(26,74,140,0.1)','rgba(26,74,140,0.35)',1.2,[5,4]);
+    // C1, C3 arcs (r)
+    if(pointsG.length>=1) wcircW(pointsG[0],gr,null,'rgba(140,42,26,0.18)',1,[4,4]);
+    if(pointsG.length>=3) wcircW(pointsG[2],gr,null,'rgba(140,42,26,0.18)',1,[4,4]);
+  }
+  // A1, A3
+  if(gA[0]&&gHR&&pointsG[0]) {
+    wline(gHR,gA[0],'rgba(26,74,140,0.35)',1,[4,4]);
+    wline(pointsG[0],gA[0],'rgba(140,42,26,0.35)',1,[4,4]);
+    wdot(gA[0],6,'#1a4a8c','#2b2415',2); wlabel(gA[0],'A₁','#1a4a8c');
+  }
+  if(gA[2]&&gHR&&pointsG[2]) {
+    wline(gHR,gA[2],'rgba(26,74,140,0.35)',1,[4,4]);
+    wline(pointsG[2],gA[2],'rgba(140,42,26,0.35)',1,[4,4]);
+    wdot(gA[2],6,'#1a4a8c','#2b2415',2); wlabel(gA[2],'A₃','#1a4a8c');
+  }
+  if(ga13) {
+    wInfLine(ga13,'rgba(122,59,16,0.38)',1,[8,5]);
+    const lp2=linePoint(ga13,gHC_t+2); wlabel(lp2,'a₁₃','#7a3b10',-20,-8);
+    // Verify H_R on a13 — draw checkmark near H_R
+    if(gHR){const[hx,hy]=toCanvas(gHR.x,gHR.y);ctx.save();ctx.fillStyle='rgba(42,110,42,0.85)';ctx.font='bold 9px Courier Prime';ctx.fillText('✓',hx+10,hy-9);ctx.restore();}
+  }
+  // Crank circle
+  if(gHC&&gCrankR>0) {
+    wcircW(gHC,gCrankR,null,'rgba(26,74,140,0.3)',1.5);
+    // C2, C4 arcs
+    if(pointsG[1]) wcircW(pointsG[1],gr,null,'rgba(42,110,42,0.18)',1,[4,4]);
+    if(pointsG[3]) wcircW(pointsG[3],gr,null,'rgba(42,110,42,0.18)',1,[4,4]);
+  }
+  // A2, A4
+  if(gA[1]&&pointsG[1]) {
+    wline(gHC,gA[1],'rgba(26,74,140,0.22)',1);
+    wline(pointsG[1],gA[1],'rgba(42,110,42,0.4)',1,[4,4]);
+    wdot(gA[1],6,'#2a6e2a','#2b2415',2); wlabel(gA[1],'A₂','#2a6e2a');
+  }
+  if(gA[3]&&pointsG[3]) {
+    wline(gHC,gA[3],'rgba(26,74,140,0.22)',1);
+    wline(pointsG[3],gA[3],'rgba(42,110,42,0.4)',1,[4,4]);
+    wdot(gA[3],6,'#7a3b10','#2b2415',2); wlabel(gA[3],'A₄','#7a3b10');
+  }
+  // P2, P4 (inverted H_R positions)
+  if(gP2) { wdot(gP2,7,'rgba(42,110,42,0.9)','#2a6e2a',2); wlabel(gP2,'2','#2a6e2a',10,-10,true); }
+  if(gP4) { wdot(gP4,7,'rgba(42,110,42,0.9)','#2a6e2a',2); wlabel(gP4,'4','#2a6e2a',10,-10,true); }
+  // Circle through P2, HR, P4 (rocker circle, centered at B1)
+  if(gB1&&gP2&&gP4&&gHR) {
+    wcircW(gB1,gRockerL,'rgba(140,42,26,0.12)','rgba(140,42,26,0.3)',1,[4,4]);
+    wline(gP2,gP4,'rgba(42,110,42,0.25)',1,[5,5]);
+  }
+
+  // Static linkage at position 1 (when not animating)
+  if(!gAnimating && gHC && gHR && gB1 && gA[0] && pointsG.length===4) {
+    // Ground link
+    wline(gHC,gHR,'rgba(138,122,88,0.6)',2.5,[7,5]);
+    // Crank H_C→A1
+    wline(gHC,gA[0],'#1a4a8c',4.5);
+    // Coupler A1→B1
+    wline(gA[0],gB1,'#2a6e2a',3.5);
+    // Rocker H_R→B1
+    wline(gHR,gB1,'#8c2a1a',4);
+    // Coupler arm A1→C1 (tracer arm)
+    wline(gA[0],pointsG[0],'rgba(42,110,42,0.7)',2,[4,3]);
+    wdot(gA[0],7,'#d4c9a8','#1a4a8c',2.5);
+    wdot(gB1,7,'#d4c9a8','#8c2a1a',2.5);
+    // Show all 4 static positions of the coupler (faded)
+    for(let i=0;i<4;i++){
+      if(!gA[i]) continue;
+      const Bi = i===0 ? gB1 : (() => {
+        const bOpts=circleXcircle(gA[i],gCouplerL,gHR,gRockerL);
+        if(!bOpts.length) return null;
+        return bOpts.reduce((best,p)=>d2(p,gB1)<d2(best,gB1)?p:best,bOpts[0]);
+      })();
+      if(!Bi) continue;
+      const Ci = rigidTransform(pointsG[0], gA[0], gB1, gA[i], Bi);
+      ctx.globalAlpha = i===0?1:0.35;
+      wline(gHC,gA[i],'#1a4a8c',i===0?4.5:2);
+      wline(gA[i],Bi,'#2a6e2a',i===0?3.5:1.5);
+      wline(gHR,Bi,'#8c2a1a',i===0?4:2);
+      wline(gA[i],Ci,'rgba(42,110,42,0.6)',i===0?2:1,[4,3]);
+      wdot(gA[i],i===0?7:5,'#d4c9a8','#1a4a8c',2);
+      wdot(Bi,i===0?7:5,'#d4c9a8','#8c2a1a',2);
+      ctx.globalAlpha=1;
+    }
+  }
+
+  // Animation
+  if(gAnimating && gB1) {
+    const pos = gFKin(gCrankAngle);
+    if(pos) {
+      const{A,B,Coupler}=pos;
+      // Tracer path
+      if(gPath.length>1){
+        ctx.save();ctx.strokeStyle='rgba(140,42,26,0.65)';ctx.lineWidth=1.5;ctx.setLineDash([3,3]);
+        ctx.beginPath();const[sx,sy]=toCanvas(gPath[0].x,gPath[0].y);ctx.moveTo(sx,sy);
+        gPath.forEach(p=>{const[px,py]=toCanvas(p.x,p.y);ctx.lineTo(px,py);});ctx.stroke();ctx.restore();
+      }
+      // Linkage in current position
+      wline(gHC,gHR,'rgba(138,122,88,0.65)',2.5,[7,5]);// ground
+      wline(gHC,A,'#1a4a8c',5.5);                       // crank
+      wline(A,B,'#2a6e2a',4);                            // coupler
+      wline(gHR,B,'#8c2a1a',5);                          // rocker
+      wline(A,Coupler,'rgba(42,110,42,0.75)',2,[4,3]);    // coupler arm to tracer
+      // Coupler triangle fill
+      ctx.save();ctx.fillStyle='rgba(42,110,42,0.1)';ctx.beginPath();
+      const[ax,ay]=toCanvas(A.x,A.y),[bx,by]=toCanvas(B.x,B.y),[tx,ty]=toCanvas(Coupler.x,Coupler.y);
+      ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.lineTo(tx,ty);ctx.closePath();ctx.fill();ctx.restore();
+      // Joints
+      wdot(A,7,'#d4c9a8','#1a4a8c',2.5);
+      wdot(B,7,'#d4c9a8','#8c2a1a',2.5);
+      // Tracer
+      wcross(Coupler,'#8c2a1a',9);
+      wdot(Coupler,4,'#8c2a1a','#2b2415',1.5);
+      // Highlight when tracer is near a precision point
+      pointsG.forEach(C=>{if(d2(Coupler,C)<0.3) wdot(C,14,'rgba(255,200,0,0.35)','#cc8800',2);});
+    }
+  }
+
+  // Ground pivots (always on top)
+  if(gHC) { wpivotXY(gHC,'#1a4a8c'); wlabel(gHC,'H_C','#1a4a8c',16,5); }
+  if(gHR) { wpivotXY(gHR,'#8c2a1a'); wlabel(gHR,'H_R','#8c2a1a',16,5); }
+  // B1 (computed rocker tip)
+  if(gB1) { wdot(gB1,8,'#9b6fa0','#5a3060',2.5); wlabel(gB1,'B₁ (computed)','#7b4090',14,-12); }
+
+  // Precision points on top
+  pointsG.forEach((C,i)=>{
+    const labels=['C₁','C₂','C₃','C₄'], cols=['#8c2a1a','#1a4a8c','#8c2a1a','#2a6e2a'];
+    ctx.globalAlpha=0.15; wdot(C,16,'transparent','#8c2a1a',1); ctx.globalAlpha=1;
+    wcross(C,'#8c2a1a',10); wdot(C,4,'#8c2a1a','#2b2415',1.5);
+    wlabel(C,labels[i],cols[i],14,-10,true);
+    wlabel(C,`(${C.x.toFixed(1)},${C.y.toFixed(1)})`,cols[i],14,5);
+  });
+
+  if(pointsG.length<4){
+    ctx.save();ctx.fillStyle='rgba(107,95,66,0.5)';ctx.font='13px Special Elite';ctx.textAlign='center';
+    ctx.fillText(`Place C₁–C₄ on canvas (${pointsG.length}/4 placed)`,canvas.width/2,canvas.height/2);ctx.restore();
+  }
+}
+
+// --- Graphical slider & UI handlers ---
+function gOnHRt() {
+  gHR_t=parseFloat(document.getElementById('gHRtSlider').value);
+  document.getElementById('gHRtVal').textContent=gHR_t.toFixed(1);
+  updateFill(document.getElementById('gHRtSlider'),'var(--stamp)');
+  gPath=[];gLastB=null;gUpdate();
+}
+function gOnR() {
+  gR=parseFloat(document.getElementById('gRSlider').value);
+  document.getElementById('gRVal').textContent=gR.toFixed(1);
+  updateFill(document.getElementById('gRSlider'),'var(--blue)');
+  gPath=[];gLastB=null;gUpdate();
+}
+function gOnr() {
+  gr=parseFloat(document.getElementById('grSlider').value);
+  document.getElementById('grVal').textContent=gr.toFixed(1);
+  updateFill(document.getElementById('grSlider'),'var(--green)');
+  gPath=[];gLastB=null;gUpdate();
+}
+function gOnHCt() {
+  gHC_t=parseFloat(document.getElementById('gHCtSlider').value);
+  document.getElementById('gHCtVal').textContent=gHC_t.toFixed(1);
+  updateFill(document.getElementById('gHCtSlider'),'var(--stamp)');
+  gPath=[];gLastB=null;gUpdate();
+}
+function gSetBranch(which, val) {
+  document.querySelectorAll(`[id^="b${which}_"]`).forEach(b=>b.className='branch-btn');
+  document.getElementById(`b${which}_${val}`).className='branch-btn active';
+  if(which==='A1') gBranchA1=val;
+  else if(which==='A3') gBranchA3=val;
+  else if(which==='B')  gBranchB=val;
+  gPath=[];gLastB=null;gUpdate();
+}
+
+function gAutoInit() {
+  if(pointsG.length<4) return;
+  const C1=pointsG[0],C3=pointsG[2];
+  const d13=d2(C1,C3)||4;
+  gHR_t=0; gHC_t=-(d13*0.45);
+  gR=Math.max(0.5,Math.min(20,d13*0.65));
+  gr=Math.max(0.5,Math.min(20,d13*0.55));
+  const setSl=(id,valId,v,decimals=1)=>{
+    const sl=document.getElementById(id); if(!sl) return;
+    sl.value=v; document.getElementById(valId).textContent=v.toFixed(decimals);
+    updateFill(sl,sl.style.getPropertyValue('--track-color')||'var(--blue)');
+  };
+  setSl('gHRtSlider','gHRtVal',gHR_t); setSl('gRSlider','gRVal',gR,1);
+  setSl('grSlider','grVal',gr,1); setSl('gHCtSlider','gHCtVal',gHC_t);
+}
+
+function updatePointListG() {
+  const list=document.getElementById('pointListG'); if(!list) return; list.innerHTML='';
+  const labs=['C₁','C₂','C₃','C₄'];
+  for(let i=0;i<4;i++){
+    const p=pointsG[i],div=document.createElement('div');div.className='point-item';
+    const dot=document.createElement('div');dot.className='point-dot'+(p?'':' empty');
+    const txt=document.createElement('div');txt.className='point-coords'+(p?'':' empty');
+    txt.innerHTML=p?`${labs[i]} &rarr; (${p.x.toFixed(2)},${p.y.toFixed(2)})`:`${labs[i]} &mdash; click canvas`;
+    div.appendChild(dot);div.appendChild(txt);list.appendChild(div);
+  }
+}
+function setStatusG(msg,type=''){
+  document.getElementById('statusBoxG').innerHTML=msg?`<span class="status-tag ${type}">${msg}</span>`:'';
+}
+function clearPointsG() {
+  pointsG=[]; gB1=null; gP2=null; gP4=null; gPath=[]; gLastB=null;
+  gAnimating=false; document.getElementById('animBtnG').innerHTML='&#9654; Animate Mechanism';
+  document.getElementById('animBtnG').disabled=true;
+  document.getElementById('defectBanner').style.display='none';
+  setStatusG(''); updatePointListG(); gUpdate();
+}
+
+// --- Hit test for drag targets ---
+const HIT_PX = 18;
+function hitTestG(px,py) {
+  const[wx,wy]=toWorld(px,py);
+  const hr=HIT_PX/viewScale;
+  if(gHR && d2({x:wx,y:wy},gHR)<hr*1.5) return {type:'HR'};
+  if(gHC && d2({x:wx,y:wy},gHC)<hr*1.5) return {type:'HC'};
+  for(let i=pointsG.length-1;i>=0;i--){
+    if(d2({x:wx,y:wy},pointsG[i])<hr*1.5) return {type:'C',idx:i};
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CANVAS EVENTS
+// ═══════════════════════════════════════════════════════════════════
+let dragging=false,dragStart=null,viewStart=null;
+
+canvas.addEventListener('mousedown',e=>{
+  if(e.button===1||e.altKey){
+    e.preventDefault();dragging=true;
+    dragStart={x:e.clientX,y:e.clientY};viewStart={x:viewOX,y:viewOY};return;
+  }
+  if(currentMode==='G5'&&e.button===0){
+    const rect5=canvas.getBoundingClientRect();
+    const px5=(e.clientX-rect5.left)*(canvas.width/rect5.width);
+    const py5=(e.clientY-rect5.top)*(canvas.height/rect5.height);
+    gDragTarget=hitTestG5(px5,py5);
+    if(gDragTarget) e.preventDefault();
+  }
+  if(currentMode==='G'&&e.button===0){
+    const rect=canvas.getBoundingClientRect();
+    const px=(e.clientX-rect.left)*(canvas.width/rect.width);
+    const py=(e.clientY-rect.top)*(canvas.height/rect.height);
+    gDragTarget=hitTestG(px,py);
+    if(gDragTarget) e.preventDefault();
+  }
+});
+
+window.addEventListener('mousemove',e=>{
+  const rect=canvas.getBoundingClientRect();
+  const px=(e.clientX-rect.left)*(canvas.width/rect.width);
+  const py=(e.clientY-rect.top)*(canvas.height/rect.height);
+  const[wx,wy]=toWorld(px,py);
+  document.getElementById('coordsDisplay').innerHTML=`x:${wx.toFixed(2)} &nbsp; y:${wy.toFixed(2)}`;
+  if(dragging){
+    const dx=(e.clientX-dragStart.x)/viewScale,dy=-(e.clientY-dragStart.y)/viewScale;
+    viewOX=viewStart.x-dx;viewOY=viewStart.y-dy;render();return;
+  }
+  if(gDragTarget&&currentMode==='G5'){
+    const{type,idx}=gDragTarget;
+    if(type==='C5'){ pointsG5[idx]={x:wx,y:wy}; updateG5PtList(); g5Path=[];g5LastB=null;g5Update(); }
+    canvas.style.cursor='grabbing';return;
+  }
+  if(gDragTarget&&currentMode==='G'){
+    const{type,idx}=gDragTarget;
+    if(type==='C'){
+      pointsG[idx]={x:wx,y:wy}; updatePointListG(); gPath=[];gLastB=null;gUpdate();
+    } else if(type==='HR'&&gc13){
+      gHR_t=Math.max(-25,Math.min(25,projLine(gc13,{x:wx,y:wy})));
+      document.getElementById('gHRtSlider').value=gHR_t;
+      document.getElementById('gHRtVal').textContent=gHR_t.toFixed(1);
+      gPath=[];gLastB=null;gUpdate();
+    } else if(type==='HC'&&ga13){
+      gHC_t=Math.max(-25,Math.min(25,projLine(ga13,{x:wx,y:wy})));
+      document.getElementById('gHCtSlider').value=gHC_t;
+      document.getElementById('gHCtVal').textContent=gHC_t.toFixed(1);
+      gPath=[];gLastB=null;gUpdate();
+    }
+    canvas.style.cursor='grabbing';return;
+  }
+  if(currentMode==='G5') canvas.style.cursor=hitTestG5(px,py)?'grab':'crosshair';
+  else if(currentMode==='G') canvas.style.cursor=hitTestG(px,py)?'grab':'crosshair';
+});
+
+window.addEventListener('mouseup',()=>{
+  dragging=false;gDragTarget=null;canvas.style.cursor='crosshair';
+});
+
+canvas.addEventListener('click',e=>{
+  if(dragging||gDragTarget) return;
+  const rect=canvas.getBoundingClientRect();
+  const px=(e.clientX-rect.left)*(canvas.width/rect.width);
+  const py=(e.clientY-rect.top)*(canvas.height/rect.height);
+  const[wx,wy]=toWorld(px,py);
+  if(currentMode==='G5'){
+    if(pointsG5.length<5){ pointsG5.push({x:wx,y:wy}); updateG5PtList(); if(pointsG5.length===5) g5AutoR(); g5Update(); }
+  } else if(currentMode==='G'){
+    if(pointsG.length<4){ pointsG.push({x:wx,y:wy}); updatePointListG(); if(pointsG.length===4) gAutoInit(); gUpdate(); }
+  } else {
+    if(points.length>=4)return;
+    points.push(C.from(wx,wy));updatePointList();
+    if(points.length===4){setStatus('4 points set &mdash; synthesizing&hellip;','info');solve();}render();
+  }
+});
+
+canvas.addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  if(currentMode==='G5'&&pointsG5.length>0){ pointsG5.pop(); updateG5PtList(); g5Path=[];g5LastB=null;g5Update(); }
+  else if(currentMode==='G'&&pointsG.length>0){ pointsG.pop(); updatePointListG(); gPath=[];gLastB=null;gUpdate(); }
+  else if(points.length>0){ points.pop();solution=null;updatePointList();setStatus('');render(); }
+});
+
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  viewScale=Math.max(5,Math.min(200,viewScale*(e.deltaY<0?1.12:0.89)));render();
+},{passive:false});
+
+let pointsG5 = [];
+let g5_r = 2.5;
+let g5BrA1=0,g5BrA2=0,g5BrA3=0,g5BrA4=0,g5BrA5=0;
+let g5Anim=false, g5Angle=0, g5Dir=1, g5Path=[], g5LastB=null;
+let g5Geom=null;
+
+// ── Init ─────────────────────────────────────────────
+buildPhiSliders();
+resize();
+updatePointList();
+updatePointListG();
+updateG5PtList();
+initSliders();
+setStatus('Click 4 precision points on the canvas to begin','info');
+gUpdate();
+
+// ═══════════════════════════════════════════════════════════════════
+// 5-POINT GRAPHICAL MODULE — Point Position Reduction
+// H_R = c15 ∩ c23 (uniquely determined)
+// H_C = a12 ∩ a23 (uniquely determined given r)
+// B1  = circumcenter(P23, HR, P4) via inversion (same as 4-pt)
+// Four-bar: H_C → A → coupler(C tracer) → B → H_R
+// ═══════════════════════════════════════════════════════════════════
+
+
+
+// ── Extra geometry helpers (shared) ──────────────────────────────────────────
+function lineIntersect2D(ln1, ln2) {
+  // Solve: ln1.mid + t*ln1.dir = ln2.mid + s*ln2.dir
+  const dx=ln2.mid.x-ln1.mid.x, dy=ln2.mid.y-ln1.mid.y;
+  const det=ln1.dir.x*ln2.dir.y - ln1.dir.y*ln2.dir.x;
+  if(Math.abs(det)<1e-9) return null; // parallel
+  const t=(dx*ln2.dir.y - dy*ln2.dir.x)/det;
+  return {x:ln1.mid.x+t*ln1.dir.x, y:ln1.mid.y+t*ln1.dir.y};
+}
+
+function rotateAboutPt(p, center, angle) {
+  const dx=p.x-center.x, dy=p.y-center.y;
+  return {
+    x: center.x + dx*Math.cos(angle) - dy*Math.sin(angle),
+    y: center.y + dx*Math.sin(angle) + dy*Math.cos(angle)
+  };
+}
+
+function rotateDir(d, angle) {
+  return {x:d.x*Math.cos(angle)-d.y*Math.sin(angle), y:d.x*Math.sin(angle)+d.y*Math.cos(angle)};
+}
+
+// ── Main computation ─────────────────────────────────────────────────────────
+function g5Update() {
+  g5Geom=null;
+  document.getElementById('animBtnG5').disabled=true;
+  ['g5b1','g5b2','g5b3','g5b4','g5b5'].forEach(id=>g5SetBadge(id,'pend','WAIT'));
+  if(pointsG5.length<5){g5Render();return;}
+
+  const [C1,C2,C3,C4,C5]=pointsG5;
+
+  // Step 1-2: H_R = c15 ∩ c23
+  const c15=midNormal(C1,C5), c23=midNormal(C2,C3);
+  if(!c15||!c23){g5SetBadge('g5b1','err','ERR');g5Render();return;}
+  const HR=lineIntersect2D(c15,c23);
+  if(!HR){g5SetBadge('g5b1','err','c15‖c23');setG5Stat('c₁₅ and c₂₃ are parallel — choose different precision points.','error');g5Render();return;}
+  g5SetBadge('g5b1','ok','H_R ✓');
+
+  // Step 3-6: tracing-paper rotation by φ15/2 about H_R → C1', C2'
+  // φ15 = angle subtended by C1 and C5 at H_R
+  const phi15 = Math.atan2(C5.y-HR.y,C5.x-HR.x) - Math.atan2(C1.y-HR.y,C1.x-HR.x);
+  const phi_h = phi15/2;
+  const C1p=rotateAboutPt(C1,HR,phi_h);
+  const C2p=rotateAboutPt(C2,HR,phi_h);
+
+  // A1 = circle(C1,r) ∩ circle(C1',r)
+  // A2 = circle(C2,r) ∩ circle(C2',r)
+  const a1opts=circleXcircle(C1,g5_r,C1p,g5_r);
+  const a2opts=circleXcircle(C2,g5_r,C2p,g5_r);
+  if(!a1opts.length||!a2opts.length){
+    g5SetBadge('g5b2','err','NO INT');
+    setG5Stat('Arcs for A₁/A₂ don\'t intersect. Increase r or reposition points.','error');
+    g5Geom={c15,c23,HR,C1p,C2p,phi_h};g5Render();return;
+  }
+  const A1=a1opts[g5BrA1%a1opts.length];
+  const A2=a2opts[g5BrA2%a2opts.length];
+  g5SetBadge('g5b2','ok','A₁A₂ ✓');
+
+  // Step 7-8: H_C = perpBis(A1,A2) ∩ a23
+  // a23 = c15 rotated by phi_h about H_R (the transferred tracing-paper bisector)
+  const a12=midNormal(A1,A2);
+  if(!a12){g5SetBadge('g5b3','err','A1=A2');g5Geom={c15,c23,HR,C1p,C2p,A1,A2,phi_h};g5Render();return;}
+  const a23={mid:HR, dir:rotateDir(c15.dir,phi_h)};
+  const HC=lineIntersect2D(a12,a23);
+  if(!HC){g5SetBadge('g5b3','err','a12‖a23');setG5Stat('a₁₂ ∥ a₂₃ — adjust r.','error');g5Geom={c15,c23,HR,C1p,C2p,A1,A2,a12,a23,phi_h};g5Render();return;}
+  const Rc=d2(HC,A1);
+  if(Rc<0.05){g5SetBadge('g5b3','err','H_C≈A1');g5Geom={c15,c23,HR,C1p,C2p,A1,A2,a12,a23,HC,phi_h};g5Render();return;}
+  g5SetBadge('g5b3','ok','H_C ✓');
+
+  // Step 9-13: A3,A4,A5 on crank circle
+  const a3opts=circleXcircle(HC,Rc,C3,g5_r);
+  const a4opts=circleXcircle(HC,Rc,C4,g5_r);
+  const a5opts=circleXcircle(HC,Rc,C5,g5_r);
+  if(!a3opts.length||!a4opts.length||!a5opts.length){
+    g5SetBadge('g5b4','err','NO INT');
+    setG5Stat('Crank circle misses C₃, C₄, or C₅. Adjust r.','error');
+    g5Geom={c15,c23,HR,C1p,C2p,A1,A2,a12,a23,HC,Rc,phi_h};g5Render();return;
+  }
+  const A3=a3opts[g5BrA3%a3opts.length];
+  const A4=a4opts[g5BrA4%a4opts.length];
+  const A5=a5opts[g5BrA5%a5opts.length];
+  const Apts=[A1,A2,A3,A4,A5];
+  g5SetBadge('g5b4','ok','A₃₋₅ ✓');
+
+  // Step 14-17: inversion (same as 4-pt)
+  // P23 = rigidTransform(H_R; C2,A2 → C1,A1)  [should ≈ rigidTransform(HR; C3,A3 → C1,A1)]
+  // P4  = rigidTransform(H_R; C4,A4 → C1,A1)
+  const P23=rigidTransform(HR,C2,A2,C1,A1);
+  const P4 =rigidTransform(HR,C4,A4,C1,A1);
+  // Verify P23 ≈ P3 (should coincide for a correct 5-pt solution)
+  const P3_check=rigidTransform(HR,C3,A3,C1,A1);
+
+  const B1=circumcenter(P23,HR,P4);
+  if(!B1){g5SetBadge('g5b5','err','COLLINEAR');setG5Stat('P[2,3], H_R, P[4] collinear — adjust r or branches.','error');g5Geom={c15,c23,HR,C1p,C2p,A1,A2,a12,a23,HC,Rc,Apts,P23,P4,phi_h};g5Render();return;}
+  const Lc=d2(A1,B1), Lr=d2(HR,B1);
+  g5SetBadge('g5b5','ok','B₁ ✓');
+
+  // Grashof
+  const Lg=d2(HC,HR);
+  const links=[Rc,Lc,Lr,Lg].sort((a,b)=>a-b);
+  const grStr=(links[0]+links[3])<=(links[1]+links[2])?'Grashof ✓':'Non-Grashof';
+
+  // Defect scan
+  const scan=g5ScanDefect(HC,HR,Rc,Lc,Lr);
+
+  g5Geom={c15,c23,HR,C1p,C2p,A1,A2,a12,a23,HC,Rc,Apts,P23,P4,P3_check,B1,Lc,Lr,Lg,grStr,
+           hasDefect:scan.hasDefect,defMsg:scan.msg,phi_h};
+  document.getElementById('animBtnG5').disabled=false;
+  g5UpdatePanel();
+  setG5Stat(scan.hasDefect?'⚠ '+scan.msg:'✓ Valid linkage — 5 precision points synthesized', scan.hasDefect?'warn':'');
+  document.getElementById('defectBanner').style.display=scan.hasDefect?'flex':'none';
+  g5Render();
+}
+
+function g5ScanDefect(HC,HR,Rc,Lc,Lr){
+  let prev=null,switches=0,locks=0,total=360;
+  for(let k=0;k<=total;k++){
+    const th=k*2*Math.PI/total;
+    const Ax=HC.x+Rc*Math.cos(th),Ay=HC.y+Rc*Math.sin(th);
+    const bo=circleXcircle({x:Ax,y:Ay},Lc,HR,Lr);
+    if(!bo.length){locks++;continue;}
+    const B=prev?bo.reduce((b,p)=>d2(p,prev)<d2(b,prev)?p:b,bo[0]):bo[0];
+    if(prev&&d2(B,prev)>Lc*0.55)switches++;
+    prev=B;
+  }
+  const h=switches>0||locks>total*0.08;
+  return{hasDefect:h,msg:h?(locks>0?'Mechanism locks (Non-Grashof)':'Circuit defect detected'):'No defect'};
+}
+
+function g5UpdatePanel(){
+  const g=g5Geom; if(!g||!g.B1) return;
+  const f=p=>p?`(${p.x.toFixed(2)},${p.y.toFixed(2)})`:'—';
+  const fN=v=>isFinite(v)?v.toFixed(3):'—';
+  document.getElementById('g5HRc').textContent  =f(g.HR);
+  document.getElementById('g5HCc').textContent  =f(g.HC);
+  document.getElementById('g5B1c').textContent  =f(g.B1);
+  document.getElementById('g5CrankL').textContent=fN(g.Rc);
+  document.getElementById('g5GroundL').textContent=fN(g.Lg);
+  document.getElementById('g5Grash').textContent =g.grStr;
+}
+
+// ── Forward kinematics ───────────────────────────────────────────────────────
+function g5FKin(theta){
+  const g=g5Geom; if(!g||!g.B1) return null;
+  const{HC,HR,Rc,Lc,Lr,Apts,B1}=g;
+  const A={x:HC.x+Rc*Math.cos(theta),y:HC.y+Rc*Math.sin(theta)};
+  const bo=circleXcircle(A,Lc,HR,Lr);
+  if(!bo.length) return null;
+  const ref=g5LastB||B1;
+  const B=bo.reduce((best,p)=>d2(p,ref)<d2(best,ref)?p:best,bo[0]);
+  if(g5LastB&&d2(B,g5LastB)>Lc*0.55) return null;
+  const Ct=rigidTransform(pointsG5[0],Apts[0],B1,A,B);
+  return{A,B,Ct};
+}
+
+// ── Animation ────────────────────────────────────────────────────────────────
+function g5ToggleAnim(){
+  if(!g5Geom||!g5Geom.B1) return;
+  g5Anim=!g5Anim;
+  document.getElementById('animBtnG5').innerHTML=g5Anim?'&#9646;&#9646; Pause':'&#9654; Animate Mechanism';
+  if(g5Anim){g5Path=[];g5LastB=null;g5Angle=Math.atan2(g5Geom.Apts[0].y-g5Geom.HC.y,g5Geom.Apts[0].x-g5Geom.HC.x);g5Loop();}
+}
+function g5Loop(){
+  if(!g5Anim) return;
+  g5Angle+=g5Dir*0.018;
+  const pos=g5FKin(g5Angle);
+  if(!pos){g5Dir*=-1;g5Angle+=g5Dir*0.036;requestAnimationFrame(g5Loop);return;}
+  g5LastB=pos.B;
+  if(pos.Ct){g5Path.push({x:pos.Ct.x,y:pos.Ct.y});if(g5Path.length>700)g5Path.shift();}
+  g5Geom.animSt=pos; g5Render();
+  requestAnimationFrame(g5Loop);
+}
+
+// ── Rendering ────────────────────────────────────────────────────────────────
+function g5Render(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#d4c9a8';ctx.fillRect(0,0,canvas.width,canvas.height);
+  drawGrid();
+
+  const g=g5Geom;
+  if(!g){
+    if(pointsG5.length<5){
+      ctx.save();ctx.fillStyle='rgba(107,95,66,.52)';ctx.font='13px Special Elite';ctx.textAlign='center';
+      ctx.fillText(`Place C₁–C₅ on canvas (${pointsG5.length}/5 placed)`,canvas.width/2,canvas.height/2);ctx.restore();
+    }
+    g5DrawPts(); return;
+  }
+
+  // c15, c23 bisectors
+  if(g.c15) wInfLine(g.c15,'rgba(26,74,140,0.3)',1,[8,5]);
+  if(g.c23) wInfLine(g.c23,'rgba(42,110,42,0.3)',1,[8,5]);
+  if(g.c15&&pointsG5.length>=5){
+    const lp=linePoint(g.c15,4); wlabel(lp,'c₁₅','#1a4a8c',-20,-8);
+    const lp2=linePoint(g.c23,4); wlabel(lp2,'c₂₃','#2a6e2a',-20,-8);
+  }
+
+  // H_R
+  if(g.HR){ wpivotXY(g.HR,'#8c2a1a'); wlabel(g.HR,'H_R','#8c2a1a',16,5); }
+
+  // C1', C2' (rotated positions — tracing paper)
+  if(g.C1p){
+    wdot(g.C1p,5,'rgba(26,74,140,0.5)','#1a4a8c',1.5);
+    wlabel(g.C1p,"C₁'",'#1a4a8c',8,-8);
+    wline(g.HR,g.C1p,'rgba(26,74,140,0.2)',1,[3,4]);
+    // arc from C1 and C1' with radius r
+    wcircW(pointsG5[0],g5_r,null,'rgba(140,42,26,0.15)',1,[4,4]);
+    wcircW(g.C1p,g5_r,null,'rgba(26,74,140,0.15)',1,[4,4]);
+  }
+  if(g.C2p){
+    wdot(g.C2p,5,'rgba(42,110,42,0.5)','#2a6e2a',1.5);
+    wlabel(g.C2p,"C₂'",'#2a6e2a',8,-8);
+    wline(g.HR,g.C2p,'rgba(42,110,42,0.2)',1,[3,4]);
+    wcircW(pointsG5[1],g5_r,null,'rgba(42,110,42,0.15)',1,[4,4]);
+    wcircW(g.C2p,g5_r,null,'rgba(26,74,140,0.15)',1,[4,4]);
+  }
+
+  // A1, A2
+  if(g.A1){
+    wdot(g.A1,6,'#1a4a8c','#2b2415',2); wlabel(g.A1,'A₁','#1a4a8c');
+    wline(g.HR,g.A1,'rgba(26,74,140,0.35)',1,[4,4]);
+    wline(pointsG5[0],g.A1,'rgba(140,42,26,0.35)',1,[4,4]);
+  }
+  if(g.A2){
+    wdot(g.A2,6,'#2a6e2a','#2b2415',2); wlabel(g.A2,'A₂','#2a6e2a');
+    wline(pointsG5[1],g.A2,'rgba(42,110,42,0.35)',1,[4,4]);
+  }
+
+  // a12, a23
+  if(g.a12) wInfLine(g.a12,'rgba(122,59,16,0.4)',1,[6,4]);
+  if(g.a23){
+    wInfLine(g.a23,'rgba(26,74,140,0.4)',1,[5,3]);
+    const lpa=linePoint(g.a23,4); wlabel(lpa,'a₂₃','#1a4a8c',-28,-8);
+  }
+  if(g.a12){const lpa12=linePoint(g.a12,4); wlabel(lpa12,'a₁₂','#7a3b10',-28,-8);}
+
+  // H_C + crank circle
+  if(g.HC){
+    wpivotXY(g.HC,'#1a4a8c'); wlabel(g.HC,'H_C','#1a4a8c',16,5);
+    if(g.Rc>0) wcircW(g.HC,g.Rc,null,'rgba(26,74,140,0.28)',1.5);
+  }
+
+  // A3, A4, A5 and arcs from C3-C5
+  const Clabels=['A₁','A₂','A₃','A₄','A₅'];
+  const Acols=['#1a4a8c','#2a6e2a','#7a3b10','#7b2d8b','#8c2a1a'];
+  if(g.Apts) g.Apts.slice(2).forEach((A,ii)=>{
+    const i=ii+2;
+    if(!A||!pointsG5[i]) return;
+    wcircW(pointsG5[i],g5_r,null,'rgba(100,80,40,0.13)',1,[3,3]);
+    wline(pointsG5[i],A,'rgba(100,80,40,0.35)',1,[4,4]);
+    if(g.HC) wline(g.HC,A,'rgba(26,74,140,0.2)',1);
+    wdot(A,6,Acols[i],'#2b2415',2); wlabel(A,Clabels[i],Acols[i]);
+  });
+
+  // P23, P4 (inverted H_R positions)
+  if(g.P23){ wdot(g.P23,7,'rgba(42,110,42,0.85)','#2a6e2a',2); wlabel(g.P23,'[2,3]','#2a6e2a',10,-10,true); }
+  if(g.P4 ){ wdot(g.P4, 7,'rgba(123,45,139,0.85)','#7b2d8b',2); wlabel(g.P4, '[4]','#7b2d8b',10,-10,true);  }
+  // P3 verification dot (should overlap with P23)
+  if(g.P3_check) wdot(g.P3_check,5,'rgba(255,120,0,0.6)','#cc5500',1.5);
+
+  // B1 + rocker circle
+  if(g.B1){
+    wdot(g.B1,8,'#9b6fa0','#5a3060',2.5); wlabel(g.B1,'B₁','#7b4090',14,-12);
+    if(g.Lr>0) wcircW(g.B1,g.Lr,'rgba(123,45,139,0.12)','rgba(123,45,139,0.3)',1,[4,4]);
+    if(g.P23) wdot(g.P23,7,'rgba(42,110,42,0.85)','#2a6e2a',2);
+    if(g.P4)  wdot(g.P4, 7,'rgba(123,45,139,0.85)','#7b2d8b',2);
+  }
+
+  // Static linkage in position 1
+  if(!g5Anim&&g.HC&&g.HR&&g.B1&&g.Apts&&pointsG5.length===5){
+    const A1=g.Apts[0], B1=g.B1;
+    wline(g.HC,g.HR,'rgba(138,122,88,0.55)',2.5,[7,5]);
+    wline(g.HC,A1,'#1a4a8c',4.5);
+    wline(A1,B1,'#2a6e2a',3.5);
+    wline(g.HR,B1,'#8c2a1a',4);
+    wline(A1,pointsG5[0],'rgba(42,110,42,0.65)',2,[4,3]);
+    wdot(A1,7,'#d4c9a8','#1a4a8c',2.5); wdot(B1,7,'#d4c9a8','#8c2a1a',2.5);
+    // Show all 5 positions faded
+    g.Apts.forEach((Ai,i)=>{
+      if(!Ai) return;
+      const bOpts=circleXcircle(Ai,g.Lc,g.HR,g.Lr);
+      if(!bOpts.length) return;
+      const Bi=bOpts.reduce((best,p)=>d2(p,B1)<d2(best,B1)?p:best,bOpts[0]);
+      const Ci=rigidTransform(pointsG5[0],A1,B1,Ai,Bi);
+      ctx.globalAlpha=i===0?1:0.3;
+      wline(g.HC,Ai,'#1a4a8c',i===0?4.5:2);
+      wline(Ai,Bi,'#2a6e2a',i===0?3.5:1.5);
+      wline(g.HR,Bi,'#8c2a1a',i===0?4:1.5);
+      wline(Ai,Ci,'rgba(42,110,42,0.6)',i===0?2:1,[3,3]);
+      wdot(Ai,i===0?7:5,'#d4c9a8','#1a4a8c',2); wdot(Bi,i===0?7:5,'#d4c9a8','#8c2a1a',2);
+      ctx.globalAlpha=1;
+    });
+  }
+
+  // Animation
+  if(g5Anim&&g.animSt){
+    const{A,B,Ct}=g.animSt;
+    if(g5Path.length>1){
+      ctx.save();ctx.strokeStyle='rgba(140,42,26,0.65)';ctx.lineWidth=1.5;ctx.setLineDash([3,3]);
+      ctx.beginPath();const[sx,sy]=toCanvas(g5Path[0].x,g5Path[0].y);ctx.moveTo(sx,sy);
+      g5Path.forEach(p=>{const[px,py]=toCanvas(p.x,p.y);ctx.lineTo(px,py);});ctx.stroke();ctx.restore();
+    }
+    wline(g.HC,g.HR,'rgba(138,122,88,0.65)',2.5,[7,5]);
+    wline(g.HC,A,'#1a4a8c',5.5);
+    wline(A,B,'#2a6e2a',4);
+    wline(g.HR,B,'#8c2a1a',5);
+    wline(A,Ct,'rgba(42,110,42,0.75)',2,[4,3]);
+    ctx.save();ctx.fillStyle='rgba(42,110,42,0.1)';ctx.beginPath();
+    const[ax,ay]=toCanvas(A.x,A.y),[bx,by]=toCanvas(B.x,B.y),[tx,ty]=toCanvas(Ct.x,Ct.y);
+    ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.lineTo(tx,ty);ctx.closePath();ctx.fill();ctx.restore();
+    wdot(A,7,'#d4c9a8','#1a4a8c',2.5); wdot(B,7,'#d4c9a8','#8c2a1a',2.5);
+    wcross(Ct,'#8c2a1a',9); wdot(Ct,4,'#8c2a1a','#2b2415',1.5);
+    pointsG5.forEach(C=>{if(d2(Ct,C)<0.3) wdot(C,14,'rgba(255,200,0,0.35)','#cc8800',2);});
+  }
+
+  // Ground pivots on top
+  if(g.HC){ wpivotXY(g.HC,'#1a4a8c'); wlabel(g.HC,'H_C','#1a4a8c',16,5); }
+  if(g.HR){ wpivotXY(g.HR,'#8c2a1a'); wlabel(g.HR,'H_R','#8c2a1a',16,5); }
+  if(g.B1){ wdot(g.B1,8,'#9b6fa0','#5a3060',2.5); wlabel(g.B1,'B₁ (auto)','#7b4090',14,-12); }
+
+  g5DrawPts();
+}
+
+function g5DrawPts(){
+  const labs=['C₁','C₂','C₃','C₄','C₅'];
+  const cols=['#8c2a1a','#1a4a8c','#2a6e2a','#7a3b10','#7b2d8b'];
+  pointsG5.forEach((C,i)=>{
+    ctx.globalAlpha=0.14; wdot(C,16,'transparent','#8c2a1a',1); ctx.globalAlpha=1;
+    const[cx,cy]=toCanvas(C.x,C.y);
+    ctx.save();ctx.strokeStyle='#8c2a1a';ctx.lineWidth=1.8;
+    ctx.beginPath();ctx.moveTo(cx-10,cy);ctx.lineTo(cx+10,cy);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx,cy-10);ctx.lineTo(cx,cy+10);ctx.stroke();
+    ctx.beginPath();ctx.arc(cx,cy,4.5,0,Math.PI*2);ctx.fillStyle=cols[i];ctx.fill();ctx.restore();
+    wlabel(C,labs[i],cols[i],14,-10,true);
+    wlabel(C,`(${C.x.toFixed(1)},${C.y.toFixed(1)})`,cols[i],14,5);
+  });
+}
+
+// ── UI helpers ───────────────────────────────────────────────────────────────
+function g5OnR(){
+  g5_r=parseFloat(document.getElementById('g5rSlider').value);
+  document.getElementById('g5rVal').textContent=g5_r.toFixed(2);
+  updateFill(document.getElementById('g5rSlider'),'var(--red)');
+  g5Path=[];g5LastB=null;g5Update();
+}
+function g5Branch(which,val){
+  document.querySelectorAll(`[id^="g5b${which}_"]`).forEach(b=>b.className='branch-btn');
+  document.getElementById(`g5b${which}_${val}`).className='branch-btn active';
+  if(which==='A1')g5BrA1=val; else if(which==='A2')g5BrA2=val;
+  else if(which==='A3')g5BrA3=val; else if(which==='A4')g5BrA4=val; else g5BrA5=val;
+  g5Path=[];g5LastB=null;g5Update();
+}
+function g5AutoR(){
+  if(pointsG5.length<5) return;
+  const d12=d2(pointsG5[0],pointsG5[1]);
+  const newR=Math.max(0.5,Math.min(13,d12*0.7));
+  g5_r=newR;
+  const sl=document.getElementById('g5rSlider'); if(!sl) return;
+  sl.value=newR; document.getElementById('g5rVal').textContent=newR.toFixed(2); updateFill(sl,'var(--red)');
+}
+function g5SetBadge(id,type,text){
+  const el=document.getElementById(id); if(!el) return;
+  el.className='g-badge g-badge-'+type; el.textContent=text;
+  const row=el.closest('.g-step-row'); if(row) row.classList.toggle('done',type==='ok');
+}
+function setG5Stat(msg,type=''){
+  document.getElementById('statusBoxG5').innerHTML=msg?`<span class="status-tag ${type}">${msg}</span>`:'';
+}
+function updateG5PtList(){
+  const list=document.getElementById('ptListG5'); if(!list) return; list.innerHTML='';
+  const labs=['C₁','C₂','C₃','C₄','C₅'];
+  for(let i=0;i<5;i++){
+    const p=pointsG5[i],div=document.createElement('div');div.className='pt-item';
+    const dot=document.createElement('div');dot.className='pt-dot'+(p?'':' mt');
+    const txt=document.createElement('div');txt.className='pt-xy'+(p?'':' mt');
+    txt.innerHTML=p?`${labs[i]} &rarr; (${p.x.toFixed(2)},${p.y.toFixed(2)})`:`${labs[i]} &mdash; click canvas`;
+    div.appendChild(dot);div.appendChild(txt);list.appendChild(div);
+  }
+}
+function g5Clear(){
+  pointsG5=[];g5Path=[];g5LastB=null;g5Geom=null;g5Anim=false;
+  document.getElementById('animBtnG5').disabled=true;
+  document.getElementById('animBtnG5').innerHTML='&#9654; Animate Mechanism';
+  document.getElementById('defectBanner').style.display='none';
+  setG5Stat('');updateG5PtList();g5Update();
+}
+function hitTestG5(px,py){
+  const[wx,wy]=toWorld(px,py), hr=HIT_PX/viewScale*1.5;
+  for(let i=pointsG5.length-1;i>=0;i--){
+    if(d2({x:wx,y:wy},pointsG5[i])<hr) return{type:'C5',idx:i};
+  }
+  return null;
+}
+
+
+</script>
+</body>
+</html>
